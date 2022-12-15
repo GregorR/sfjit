@@ -422,6 +422,13 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_enter(struct sljit_compiler *compi
 		PUSH_REG(reg_lmap[i]);
 	}
 
+	/* Ensure stack alignment */
+	{
+		sljit_s32 align_size = ((saved_regs_size + 0xf) & ~0xf) - saved_regs_size;
+		if (align_size)
+			BINARY_IMM32(SUB, align_size, SLJIT_STACKP, 0);
+	}
+
 	inst = (sljit_u8*)ensure_buf(compiler, 2);
 	FAIL_IF(!inst);
 	INC_SIZE(1);
@@ -535,13 +542,6 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_enter(struct sljit_compiler *compi
 #endif
 
 	EMIT_MOV(compiler, SLJIT_FRAMEP, 0, SLJIT_STACKP, 0);
-
-	/* ensure stack alignment */
-	{
-		sljit_s32 align_size = ((saved_regs_size + 0xf) & ~0xf) - saved_regs_size;
-		if (align_size)
-			BINARY_IMM32(SUB, align_size, SLJIT_STACKP, 0);
-	}
 
 #ifdef _WIN64
 	if (saved_float_regs_size > 0) {
@@ -658,6 +658,16 @@ static sljit_s32 emit_stack_frame_release(struct sljit_compiler *compiler, sljit
 	FAIL_IF(!inst);
 	INC_SIZE(1);
 	POP_REG(reg_lmap[SLJIT_FRAMEP]);
+
+	/* Buffer for stack alignment */
+	{
+		/* FIXME: Deduplicate */
+		sljit_s32 saved_arg_count = SLJIT_KEPT_SAVEDS_COUNT(compiler->options);
+		sljit_s32 saved_regs_size = GET_SAVED_REGISTERS_SIZE(compiler->scratches, compiler->saveds - saved_arg_count, 2);
+		sljit_s32 align_size = ((saved_regs_size + 0xf) & ~0xf) - saved_regs_size;
+		if (align_size)
+			BINARY_IMM32(ADD, align_size, SLJIT_STACKP, 0);
+	}
 
 	tmp = compiler->scratches;
 	for (i = SLJIT_FIRST_SAVED_REG; i <= tmp; i++) {
