@@ -206,11 +206,9 @@ extern "C" {
 /* Registers >= SLJIT_FIRST_SAVED_REG are saved registers. */
 #define SLJIT_FIRST_SAVED_REG (SLJIT_S0 - SLJIT_NUMBER_OF_SAVED_REGISTERS + 1)
 
-/* The SLJIT_SP provides direct access to the linear stack space allocated by
-   sljit_emit_enter. It can only be used in the following form: SLJIT_MEM1(SLJIT_SP).
-   The immediate offset is extended by the relative stack offset automatically.
-   The sljit_get_local_base can be used to obtain the real address of a value. */
-#define SLJIT_SP	(SLJIT_NUMBER_OF_REGISTERS + 1)
+/* Stack and frame pointers */
+#define SLJIT_STACKP	(SLJIT_NUMBER_OF_REGISTERS + 1)
+#define SLJIT_FRAMEP	(SLJIT_NUMBER_OF_REGISTERS + 2)
 
 /* Return with machine word. */
 
@@ -410,6 +408,11 @@ struct sljit_const {
 	sljit_uw addr;
 };
 
+struct sljit_alloca {
+	struct sljit_alloca *next;
+	sljit_uw addr;
+};
+
 struct sljit_compiler {
 	sljit_s32 error;
 	sljit_s32 options;
@@ -418,10 +421,12 @@ struct sljit_compiler {
 	struct sljit_jump *jumps;
 	struct sljit_put_label *put_labels;
 	struct sljit_const *consts;
+	struct sljit_alloca *allocas;
 	struct sljit_label *last_label;
 	struct sljit_jump *last_jump;
 	struct sljit_const *last_const;
 	struct sljit_put_label *last_put_label;
+	struct sljit_alloca *last_alloca;
 
 	void *allocator_data;
 	void *exec_allocator_data;
@@ -436,8 +441,6 @@ struct sljit_compiler {
 	sljit_s32 fscratches;
 	/* Available float saved registers. */
 	sljit_s32 fsaveds;
-	/* Local stack size. */
-	sljit_s32 local_size;
 	/* Maximum code size. */
 	sljit_uw size;
 	/* Relative offset of the executable mapping from the writable mapping. */
@@ -722,7 +725,7 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_cmp_info(sljit_s32 type);
 
 SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_enter(struct sljit_compiler *compiler,
 	sljit_s32 options, sljit_s32 arg_types, sljit_s32 scratches, sljit_s32 saveds,
-	sljit_s32 fscratches, sljit_s32 fsaveds, sljit_s32 local_size);
+	sljit_s32 fscratches, sljit_s32 fsaveds);
 
 /* The SLJIT compiler has a current context (which contains the local
    stack space size, number of used registers, etc.) which is initialized
@@ -739,7 +742,7 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_enter(struct sljit_compiler *compi
 
 SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_set_context(struct sljit_compiler *compiler,
 	sljit_s32 options, sljit_s32 arg_types, sljit_s32 scratches, sljit_s32 saveds,
-	sljit_s32 fscratches, sljit_s32 fsaveds, sljit_s32 local_size);
+	sljit_s32 fscratches, sljit_s32 fsaveds);
 
 /* Return to the caller function. The sljit_emit_return_void function
    does not return with any value. The sljit_emit_return function returns
@@ -785,6 +788,17 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_return_to(struct sljit_compiler *c
    Flags: - (does not modify flags). */
 
 SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_fast_enter(struct sljit_compiler *compiler, sljit_s32 dst, sljit_sw dstw);
+
+/* Emit stack allocation. Each subsequent stack allocation will consume more
+ * linear stack space. Can be accessed either from the frame pointer or the
+ * stack pointer. The amount allocated can be patched later, if zero. */
+SLJIT_API_FUNC_ATTRIBUTE struct sljit_alloca* sljit_emit_alloca(struct sljit_compiler *compiler, sljit_s32 size);
+
+/* Patch this stack allocation to the given size. */
+SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_set_alloca(struct sljit_compiler *compiler, struct sljit_alloca *alloc, sljit_s32 size);
+
+/* Emit a stack pop. */
+SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_pop(struct sljit_compiler *compiler, sljit_s32 size);
 
 /*
    Source and destination operands for arithmetical instructions
@@ -1621,19 +1635,6 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_fmem(struct sljit_compiler *compil
 SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_fmem_update(struct sljit_compiler *compiler, sljit_s32 type,
 	sljit_s32 freg,
 	sljit_s32 mem, sljit_sw memw);
-
-/* Copies the base address of SLJIT_SP + offset to dst. The offset can
-   represent the starting address of a value in the local data (stack).
-   The offset is not limited by the local data limits, it can be any value.
-   For example if an array of bytes are stored on the stack from
-   offset 0x40, and R0 contains the offset of an array item plus 0x120,
-   this item can be changed by two SLJIT instructions:
-
-   sljit_get_local_base(compiler, SLJIT_R1, 0, 0x40 - 0x120);
-   sljit_emit_op1(compiler, SLJIT_MOV_U8, SLJIT_MEM2(SLJIT_R1, SLJIT_R0), 0, SLJIT_IMM, 0x5);
-
-   Flags: - (may destroy flags) */
-SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_get_local_base(struct sljit_compiler *compiler, sljit_s32 dst, sljit_sw dstw, sljit_sw offset);
 
 /* Store a value that can be changed runtime (see: sljit_get_const_addr / sljit_set_const)
    Flags: - (does not modify flags) */
