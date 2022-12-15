@@ -979,7 +979,18 @@ SLJIT_API_FUNC_ATTRIBUTE struct sljit_alloca* sljit_emit_alloca(struct sljit_com
 
 SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_set_alloca(struct sljit_compiler *compiler, struct sljit_alloca *alloc, sljit_s32 size)
 {
+	/* Ensure stack alignment */
+	size = (size + 0xf) & ~0xf;
 	*((sljit_s32 *) (compiler->buf->memory + alloc->addr + 2)) = size;
+	return SLJIT_SUCCESS;
+}
+
+SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_pop(struct sljit_compiler *compiler, sljit_s32 size)
+{
+	sljit_u8 *inst;
+	/* Ensure stack alignment */
+	size = (size + 0xf) & ~0xf;
+	BINARY_IMM32(ADD, size, SLJIT_STACKP, 0);
 	return SLJIT_SUCCESS;
 }
 

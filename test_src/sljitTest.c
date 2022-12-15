@@ -10649,6 +10649,75 @@ static void test85(void)
 	successful_tests++;
 }
 
+static void testa1(void)
+{
+	/* Test for alloca access via various means */
+	executable_code code;
+	struct sljit_compiler* compiler = sljit_create_compiler(NULL, NULL);
+	struct sljit_alloca *allocs[2];
+	sljit_sw buf[5];
+	sljit_s32 i;
+
+	if (verbose)
+		printf("Run testa1\n");
+
+	FAILED(!compiler, "cannot create compiler\n");
+
+	for (i = 0; i < 5; i++)
+		buf[i] = -1;
+
+	(sljit_emit_enter)(compiler, 0, SLJIT_ARGS1(VOID, W), 0, 1, 0, 0);
+
+	/* NOTE: This test assumes that 2-word alignment is fine on all
+	 * platforms! */
+
+	/* buf[4], buf[3] */
+	allocs[0] = sljit_emit_alloca(compiler, 0);
+	sljit_emit_op1(compiler, SLJIT_MOV, SLJIT_MEM1(SLJIT_STACKP), 0, SLJIT_IMM, 3);
+	sljit_emit_op1(compiler, SLJIT_MOV, SLJIT_MEM1(SLJIT_FRAMEP), -((int) sizeof(sljit_sw)), SLJIT_IMM, 4);
+
+	/* buf[2], buf[1] allocated but not set */
+	allocs[1] = sljit_emit_alloca(compiler, 0);
+	sljit_emit_op1(compiler, SLJIT_MOV, SLJIT_MEM1(SLJIT_FRAMEP), -3 * ((int) sizeof(sljit_sw)), SLJIT_IMM, 2);
+
+	/* buf[0] allocated and set, buf[1] set */
+	sljit_emit_alloca(compiler, 2 * sizeof(sljit_sw));
+	sljit_emit_op1(compiler, SLJIT_MOV, SLJIT_MEM1(SLJIT_STACKP), sizeof(sljit_sw), SLJIT_IMM, 0);
+	sljit_emit_op1(compiler, SLJIT_MOV, SLJIT_MEM1(SLJIT_STACKP), 2 * sizeof(sljit_sw), SLJIT_IMM, 1);
+
+	/* pop buf[0] */
+	sljit_emit_op1(compiler, SLJIT_MOV, SLJIT_MEM1(SLJIT_S0), 0, SLJIT_MEM1(SLJIT_STACKP), sizeof(sljit_sw));
+	sljit_emit_pop(compiler, 2 * sizeof(sljit_sw));
+
+	/* resolve and pop buf[1], buf[2] */
+	sljit_emit_op1(compiler, SLJIT_MOV, SLJIT_MEM1(SLJIT_S0), sizeof(sljit_sw), SLJIT_MEM1(SLJIT_STACKP), 0);
+	sljit_emit_op1(compiler, SLJIT_MOV, SLJIT_MEM1(SLJIT_S0), 2 * sizeof(sljit_sw), SLJIT_MEM1(SLJIT_STACKP), sizeof(sljit_sw));
+	sljit_set_alloca(compiler, allocs[1], 2 * sizeof(sljit_sw));
+	sljit_emit_pop(compiler, 2 * sizeof(sljit_sw));
+
+	/* resolve but don't pop buf[3], buf[4] */
+	sljit_emit_op1(compiler, SLJIT_MOV, SLJIT_MEM1(SLJIT_S0), 3 * sizeof(sljit_sw), SLJIT_MEM1(SLJIT_STACKP), 0);
+	sljit_emit_op1(compiler, SLJIT_MOV, SLJIT_MEM1(SLJIT_S0), 4 * sizeof(sljit_sw), SLJIT_MEM1(SLJIT_STACKP), sizeof(sljit_sw));
+	sljit_set_alloca(compiler, allocs[0], 2 * sizeof(sljit_sw));
+
+	sljit_emit_return_void(compiler);
+
+	code.code = sljit_generate_code(compiler);
+	CHECK(compiler);
+	sljit_free_compiler(compiler);
+
+	code.func1((sljit_sw)buf);
+
+	FAILED(buf[0] != 0, "testa1 case 1 failed\n");
+	FAILED(buf[1] != 1, "testa1 case 2 failed\n");
+	FAILED(buf[2] != 2, "testa1 case 3 failed\n");
+	FAILED(buf[3] != 3, "testa1 case 4 failed\n");
+	FAILED(buf[4] != 4, "testa1 case 5 failed\n");
+
+	sljit_free_code(code.code, NULL);
+	successful_tests++;
+}
+
 #undef WCONST
 
 int sljit_test(int argc, char* argv[])
@@ -10749,11 +10818,13 @@ int sljit_test(int argc, char* argv[])
 	test84();
 	test85();
 
+	testa1();
+
 #if (defined SLJIT_EXECUTABLE_ALLOCATOR && SLJIT_EXECUTABLE_ALLOCATOR)
 	sljit_free_unused_memory_exec();
 #endif
 
-#	define TEST_COUNT 85
+#	define TEST_COUNT 85 + 1
 
 	printf("SLJIT tests: ");
 	if (successful_tests == TEST_COUNT)
