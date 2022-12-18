@@ -943,7 +943,7 @@ static sljit_sw gen_alloca(struct sljit_compiler *compiler, struct sljit_alloca 
 {
 	sljit_u8 *inst;
 	BINARY_IMM32(SUB, 0x12345678, SLJIT_STACKP, 0);
-	alloc->addr = (sljit_uw) (inst - compiler->buf->memory);
+	alloc->addr = inst;
 	return SLJIT_SUCCESS;
 }
 
@@ -979,9 +979,11 @@ SLJIT_API_FUNC_ATTRIBUTE struct sljit_alloca* sljit_emit_alloca(struct sljit_com
 
 SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_set_alloca(struct sljit_compiler *compiler, struct sljit_alloca *alloc, sljit_s32 size)
 {
+	(void) compiler;
+
 	/* Ensure stack alignment */
 	size = (size + 0xf) & ~0xf;
-	*((sljit_s32 *) (compiler->buf->memory + alloc->addr + 2)) = size;
+	*((sljit_s32 *) (alloc->addr + 2)) = size;
 	return SLJIT_SUCCESS;
 }
 
