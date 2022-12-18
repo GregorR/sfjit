@@ -421,12 +421,10 @@ struct sljit_compiler {
 	struct sljit_jump *jumps;
 	struct sljit_put_label *put_labels;
 	struct sljit_const *consts;
-	struct sljit_alloca *allocas;
 	struct sljit_label *last_label;
 	struct sljit_jump *last_jump;
 	struct sljit_const *last_const;
 	struct sljit_put_label *last_put_label;
-	struct sljit_alloca *last_alloca;
 
 	void *allocator_data;
 	void *exec_allocator_data;

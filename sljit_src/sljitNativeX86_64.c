@@ -954,13 +954,6 @@ SLJIT_API_FUNC_ATTRIBUTE struct sljit_alloca* sljit_emit_alloca(struct sljit_com
 	alloc = (struct sljit_alloca *)
 		ensure_abuf(compiler, sizeof(struct sljit_alloca));
 	PTR_FAIL_IF_NULL(alloc);
-	if (compiler->allocas) {
-		alloc->next = compiler->allocas;
-		compiler->allocas = alloc;
-	} else {
-		alloc->next = NULL;
-		compiler->allocas = compiler->last_alloca = alloc;
-	}
 
 #ifdef _WIN64
 	abort(); // To be dealt with later
