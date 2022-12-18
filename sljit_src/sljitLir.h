@@ -410,7 +410,7 @@ struct sljit_const {
 
 struct sljit_alloca {
 	struct sljit_alloca *next;
-	sljit_uw addr;
+	sljit_u8 *addr;
 };
 
 struct sljit_compiler {
