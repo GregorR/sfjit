@@ -31,6 +31,11 @@
 #include <stdlib.h>
 #include <string.h>
 
+#define sljit_emit_enter(A, B, C, D, E, F, G, H) do { \
+    sljit_emit_enter(A, B, C, D, E, F, G, H); \
+    sljit_emit_alloca(A, 1); \
+} while (0)
+
 #ifdef _MSC_VER
 #pragma warning(push)
 #pragma warning(disable: 4127) /* conditional expression is constant */
@@ -3856,7 +3861,7 @@ static void test39(void)
 	/* Such assignment should never happen in a regular program. */
 	compiler->error = -3967;
 
-	SLJIT_ASSERT(sljit_emit_enter(compiler, 0, SLJIT_ARGS2(VOID, W, W), 5, 5, 6, 0, 32) == -3967);
+	SLJIT_ASSERT((sljit_emit_enter)(compiler, 0, SLJIT_ARGS2(VOID, W, W), 5, 5, 6, 0, 32) == -3967);
 	SLJIT_ASSERT(sljit_emit_return(compiler, SLJIT_MOV, SLJIT_R1, 0) == -3967);
 	SLJIT_ASSERT(sljit_emit_op0(compiler, SLJIT_NOP) == -3967);
 	SLJIT_ASSERT(sljit_emit_op0(compiler, SLJIT_ENDBR) == -3967);
@@ -10649,7 +10654,7 @@ static void testa1(void)
 	for (i = 0; i < 5; i++)
 		buf[i] = -1;
 
-	sljit_emit_enter(compiler, 0, SLJIT_ARGS1(VOID, W), 0, 1, 0, 0, 0);
+	(sljit_emit_enter)(compiler, 0, SLJIT_ARGS1(VOID, W), 0, 1, 0, 0, 0);
 
 	/* NOTE: This test assumes that 2-word alignment is fine on all
 	 * platforms! */
