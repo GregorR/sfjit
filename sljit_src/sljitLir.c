@@ -259,7 +259,7 @@
 		(fsaveds)) * (sljit_s32)(size))
 
 #define ADJUST_LOCAL_OFFSET(p, i) \
-	if ((p) == (SLJIT_MEM1(SLJIT_SP))) \
+	if ((p) == (SLJIT_MEM1(SLJIT_FRAMEP)) && (i) >= 0) \
 		(i) += SLJIT_LOCALS_OFFSET;
 
 #endif /* !(defined SLJIT_CONFIG_UNSUPPORTED && SLJIT_CONFIG_UNSUPPORTED) */
@@ -822,8 +822,11 @@ static sljit_s32 function_check_src_mem(struct sljit_compiler *compiler, sljit_s
 	if (!(p & SLJIT_MEM))
 		return 0;
 
-	if (p == SLJIT_MEM1(SLJIT_SP))
-		return (i >= 0 && i < compiler->logical_local_size);
+	if (p == SLJIT_MEM1(SLJIT_FRAMEP))
+		return (i < 0) || (i >= 0 && i < compiler->logical_local_size);
+
+	if (p == SLJIT_MEM1(SLJIT_STACKP))
+		return 1;
 
 	if (!(!(p & REG_MASK) || FUNCTION_CHECK_IS_REG(p & REG_MASK)))
 		return 0;
@@ -923,10 +926,14 @@ static void sljit_verbose_reg(struct sljit_compiler *compiler, sljit_s32 r)
 {
 	if (r < (SLJIT_R0 + compiler->scratches))
 		fprintf(compiler->verbose, "r%d", r - SLJIT_R0);
-	else if (r != SLJIT_SP)
+	else if (r < SLJIT_STACKP)
 		fprintf(compiler->verbose, "s%d", SLJIT_NUMBER_OF_REGISTERS - r);
-	else
+	else if (r == SLJIT_STACKP)
 		fprintf(compiler->verbose, "sp");
+	else if (r == SLJIT_FRAMEP)
+		fprintf(compiler->verbose, "fp");
+	else
+		fprintf(compiler->verbose, "r?%d", r - SLJIT_R0);
 }
 
 static void sljit_verbose_freg(struct sljit_compiler *compiler, sljit_s32 r)
@@ -2637,13 +2644,13 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_get_local_base(struct sljit_compiler *c
 	CHECK_ERROR();
 	CHECK(check_sljit_get_local_base(compiler, dst, dstw, offset));
 
-	ADJUST_LOCAL_OFFSET(SLJIT_MEM1(SLJIT_SP), offset);
+	ADJUST_LOCAL_OFFSET(SLJIT_MEM1(SLJIT_FRAMEP), offset);
 
 	SLJIT_SKIP_CHECKS(compiler);
 
 	if (offset != 0)
-		return sljit_emit_op2(compiler, SLJIT_ADD, dst, dstw, SLJIT_SP, 0, SLJIT_IMM, offset);
-	return sljit_emit_op1(compiler, SLJIT_MOV, dst, dstw, SLJIT_SP, 0);
+		return sljit_emit_op2(compiler, SLJIT_ADD, dst, dstw, SLJIT_FRAMEP, 0, SLJIT_IMM, offset);
+	return sljit_emit_op1(compiler, SLJIT_MOV, dst, dstw, SLJIT_FRAMEP, 0);
 }
 
 #endif

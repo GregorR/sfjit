@@ -1,3 +1,19 @@
+This is SFJIT, a stackful modification of the stackless JIT (sljit). For
+backwards compatibility, it is still named sljit. There are a few major changes:
+
+(1) SLJIT_SP is renamed to SLJIT_FRAMEP, and is (as suggested) now the frame
+    pointer. Otherwise its behavior is the same. That is, locals allocated
+    during emit_enter are accessed through SLJIT_FRAMEP.
+
+(2) SLJIT_STACKP is introduced, and is the actual stack pointer. New space can
+    be allocated by sljit_emit_alloca and optionally deallocated with
+    sljit_emit_pop.
+
+Space allocated with sljit_emit_alloca can be modified post hoc using
+sljit_set_alloca, so you can generate code without being certain of how much
+space is needed, then adapt on the fly.
+
+---
 
                      SLJIT - Stack Less JIT Compiler
 

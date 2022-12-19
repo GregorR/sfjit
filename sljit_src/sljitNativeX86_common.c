@@ -82,29 +82,29 @@ static const sljit_u8 reg_map[SLJIT_NUMBER_OF_REGISTERS + 3] = {
 #else /* SLJIT_CONFIG_X86_32 */
 
 /* Last register + 1. */
-#define TMP_REG1	(SLJIT_NUMBER_OF_REGISTERS + 2)
-#define TMP_REG2	(SLJIT_NUMBER_OF_REGISTERS + 3)
+#define TMP_REG1	(SLJIT_NUMBER_OF_REGISTERS + 3)
+#define TMP_REG2	(SLJIT_NUMBER_OF_REGISTERS + 4)
 
 /* Note: r12 & 0x7 == 0b100, which decoded as SIB byte present
    Note: avoid to use r12 and r13 for memory addessing
    therefore r12 is better to be a higher saved register. */
 #ifndef _WIN64
 /* Args: rdi(=7), rsi(=6), rdx(=2), rcx(=1), r8, r9. Scratches: rax(=0), r10, r11 */
-static const sljit_u8 reg_map[SLJIT_NUMBER_OF_REGISTERS + 4] = {
-	0, 0, 6, 7, 1, 8, 11, 10, 12, 5, 13, 14, 15, 3, 4, 2, 9
+static const sljit_u8 reg_map[SLJIT_NUMBER_OF_REGISTERS + 5] = {
+	0, 0, 6, 7, 1, 8, 11, 10, 12, 13, 14, 15, 3, 4, 5, 2, 9
 };
 /* low-map. reg_map & 0x7. */
-static const sljit_u8 reg_lmap[SLJIT_NUMBER_OF_REGISTERS + 4] = {
-	0, 0, 6, 7, 1, 0, 3,  2,  4,  5,  5,  6,  7, 3, 4, 2, 1
+static const sljit_u8 reg_lmap[SLJIT_NUMBER_OF_REGISTERS + 5] = {
+	0, 0, 6, 7, 1, 0, 3,  2,  4,  5,  6,  7, 3, 4,  5, 2, 1
 };
 #else
 /* Args: rcx(=1), rdx(=2), r8, r9. Scratches: rax(=0), r10, r11 */
-static const sljit_u8 reg_map[SLJIT_NUMBER_OF_REGISTERS + 4] = {
-	0, 0, 2, 8, 1, 11, 12, 5, 13, 14, 15, 7, 6, 3, 4, 9, 10
+static const sljit_u8 reg_map[SLJIT_NUMBER_OF_REGISTERS + 5] = {
+	0, 0, 2, 8, 1, 11, 12, 13, 14, 15, 7, 6, 3, 4, 5, 9, 10
 };
 /* low-map. reg_map & 0x7. */
-static const sljit_u8 reg_lmap[SLJIT_NUMBER_OF_REGISTERS + 4] = {
-	0, 0, 2, 0, 1,  3,  4, 5,  5,  6,  7, 7, 6, 3, 4, 1,  2
+static const sljit_u8 reg_lmap[SLJIT_NUMBER_OF_REGISTERS + 5] = {
+	0, 0, 2, 0, 1,  3,  4,  5,  6,  7, 7, 6, 3, 4, 5, 1,  2
 };
 #endif
 
@@ -3288,13 +3288,13 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_get_local_base(struct sljit_compiler *c
 	compiler->mode32 = 0;
 #endif
 
-	ADJUST_LOCAL_OFFSET(SLJIT_MEM1(SLJIT_SP), offset);
+	ADJUST_LOCAL_OFFSET(SLJIT_MEM1(SLJIT_FRAMEP), offset);
 
 #if (defined SLJIT_CONFIG_X86_64 && SLJIT_CONFIG_X86_64)
 	if (NOT_HALFWORD(offset)) {
 		FAIL_IF(emit_load_imm64(compiler, TMP_REG1, offset));
 #if (defined SLJIT_DEBUG && SLJIT_DEBUG)
-		SLJIT_ASSERT(emit_lea_binary(compiler, dst, dstw, SLJIT_SP, 0, TMP_REG1, 0) != SLJIT_ERR_UNSUPPORTED);
+		SLJIT_ASSERT(emit_lea_binary(compiler, dst, dstw, SLJIT_FRAMEP, 0, TMP_REG1, 0) != SLJIT_ERR_UNSUPPORTED);
 		return compiler->error;
 #else
 		return emit_lea_binary(compiler, dst, dstw, SLJIT_SP, 0, TMP_REG1, 0);
@@ -3303,8 +3303,8 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_get_local_base(struct sljit_compiler *c
 #endif
 
 	if (offset != 0)
-		return emit_lea_binary(compiler, dst, dstw, SLJIT_SP, 0, SLJIT_IMM, offset);
-	return emit_mov(compiler, dst, dstw, SLJIT_SP, 0);
+		return emit_lea_binary(compiler, dst, dstw, SLJIT_FRAMEP, 0, SLJIT_IMM, offset);
+	return emit_mov(compiler, dst, dstw, SLJIT_FRAMEP, 0);
 }
 
 SLJIT_API_FUNC_ATTRIBUTE struct sljit_const* sljit_emit_const(struct sljit_compiler *compiler, sljit_s32 dst, sljit_sw dstw, sljit_sw init_value)

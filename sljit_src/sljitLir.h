@@ -206,11 +206,15 @@ extern "C" {
 /* Registers >= SLJIT_FIRST_SAVED_REG are saved registers. */
 #define SLJIT_FIRST_SAVED_REG (SLJIT_S0 - SLJIT_NUMBER_OF_SAVED_REGISTERS + 1)
 
-/* The SLJIT_SP provides direct access to the linear stack space allocated by
-   sljit_emit_enter. It can only be used in the following form: SLJIT_MEM1(SLJIT_SP).
+/* The SLJIT_FRAMEP provides direct access to the linear stack space allocated by
+   sljit_emit_enter. It can only be used in the following form: SLJIT_MEM1(SLJIT_FRAMEP).
    The immediate offset is extended by the relative stack offset automatically.
    The sljit_get_local_base can be used to obtain the real address of a value. */
-#define SLJIT_SP	(SLJIT_NUMBER_OF_REGISTERS + 1)
+#define SLJIT_FRAMEP	(SLJIT_NUMBER_OF_REGISTERS + 2)
+
+/* SLJIT_STACKP is the stack pointer, which can be used to access space
+ * allocated by sljit_emit_alloca. */
+#define SLJIT_STACKP	(SLJIT_NUMBER_OF_REGISTERS + 1)
 
 /* Return with machine word. */
 
@@ -408,6 +412,12 @@ struct sljit_put_label {
 struct sljit_const {
 	struct sljit_const *next;
 	sljit_uw addr;
+};
+
+struct sljit_alloca {
+	struct sljit_alloca *next;
+	sljit_uw size;
+	sljit_u8 *addr;
 };
 
 struct sljit_compiler {
@@ -785,6 +795,17 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_return_to(struct sljit_compiler *c
    Flags: - (does not modify flags). */
 
 SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_fast_enter(struct sljit_compiler *compiler, sljit_s32 dst, sljit_sw dstw);
+
+/* Emit stack allocation. Each subsequent stack allocation will consume more
+ * linear stack space. Can be accessed either from the frame pointer or the
+ * stack pointer. The amount allocated can be patched later, if zero. */
+SLJIT_API_FUNC_ATTRIBUTE struct sljit_alloca* sljit_emit_alloca(struct sljit_compiler *compiler, sljit_uw size);
+
+/* Patch this stack allocation to the given size. */
+SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_set_alloca(struct sljit_compiler *compiler, struct sljit_alloca *alloc, sljit_uw size);
+
+/* Emit a stack pop. */
+SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_pop(struct sljit_compiler *compiler, sljit_uw size);
 
 /*
    Source and destination operands for arithmetical instructions
