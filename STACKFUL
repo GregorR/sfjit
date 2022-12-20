@@ -1,0 +1,25 @@
+How to make a system stackful:
+
+(1) Determine what the frame pointer is on that platform and whether it's
+    caller- or callee-saved.
+
+(2) Change the register count and map on the target system to move the frame
+    pointer out of the typical map and to location NUMBER_OF_REGISTERS + 2. Note
+    that this usually also involves moving the temporary registers up.
+
+(3) Modify emit_enter and emit_return (in the latter case, typically via
+    emit_frame_release) to
+
+    (a) Save the frame pointer while it's saving other registers. Look for
+        GET_SAVED_REGISTERS_SIZE in particular.
+
+    (b) Set the frame pointer equal to the stack pointer when it's done
+
+    (c) Reset the stack pointer based on the frame pointer in the epilogue
+
+    (d) Restore the frame pointer while restoring other registers
+
+(4) Implement sljit_emit_alloca, sljit_set_alloca, and sljit_emit_pop.
+
+(5) If applicable, fix up virtual registers to work from the frame pointer
+    instead of the stack pointer.
