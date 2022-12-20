@@ -7046,11 +7046,18 @@ static void test68(void)
 	struct sljit_jump *call, *jump;
 	struct sljit_label *label;
 	int i;
+	int regCt =
+#if SLJIT_NUMBER_OF_REGISTERS >= 12
+		6
+#else
+		5
+#endif
+		;
 
 	if (verbose)
 		printf("Run test68\n");
 
-	for (i = 0; i < 6; i++) {
+	for (i = 0; i < regCt; i++) {
 		compiler = sljit_create_compiler(NULL, NULL);
 		FAILED(!compiler, "cannot create compiler\n");
 

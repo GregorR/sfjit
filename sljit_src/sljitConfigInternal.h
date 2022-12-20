@@ -142,7 +142,7 @@ extern "C" {
 #elif defined(__x86_64__)
 #define SLJIT_CONFIG_X86_64 1
 #elif defined(__arm__) || defined(__ARM__)
-#ifdef __thumb2__
+#if 0 && defined __thumb2__
 #define SLJIT_CONFIG_ARM_THUMB2 1
 #elif defined(__ARM_ARCH_7__) || defined(__ARM_ARCH_7A__) || defined(__ARM_ARCH_7R__)
 #define SLJIT_CONFIG_ARM_V7 1
@@ -669,8 +669,8 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_sw sljit_exec_offset(void* ptr);
 
 #elif (defined SLJIT_CONFIG_ARM_V5 && SLJIT_CONFIG_ARM_V5) || (defined SLJIT_CONFIG_ARM_V7 && SLJIT_CONFIG_ARM_V7)
 
-#define SLJIT_NUMBER_OF_REGISTERS 12
-#define SLJIT_NUMBER_OF_SAVED_REGISTERS 8
+#define SLJIT_NUMBER_OF_REGISTERS 11
+#define SLJIT_NUMBER_OF_SAVED_REGISTERS 7
 #define SLJIT_NUMBER_OF_FLOAT_REGISTERS 14
 #define SLJIT_NUMBER_OF_SAVED_FLOAT_REGISTERS 8
 #define SLJIT_LOCALS_OFFSET_BASE 0
