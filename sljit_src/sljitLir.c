@@ -809,7 +809,7 @@ static sljit_s32 function_check_arguments(sljit_s32 arg_types, sljit_s32 scratch
 	|| ((fr) > (SLJIT_FS0 - compiler->fsaveds) && (fr) <= SLJIT_FS0))
 
 #if (defined SLJIT_CONFIG_X86_32 && SLJIT_CONFIG_X86_32)
-#define CHECK_IF_VIRTUAL_REGISTER(p) ((p) <= SLJIT_S3 && (p) >= SLJIT_S8)
+#define CHECK_IF_VIRTUAL_REGISTER(p) ((p) <= SLJIT_S2 && (p) >= SLJIT_R3)
 #else
 #define CHECK_IF_VIRTUAL_REGISTER(p) 0
 #endif

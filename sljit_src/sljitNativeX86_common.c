@@ -66,16 +66,16 @@ SLJIT_API_FUNC_ATTRIBUTE const char* sljit_get_platform_name(void)
 #if (defined SLJIT_CONFIG_X86_32 && SLJIT_CONFIG_X86_32)
 
 /* Last register + 1. */
-#define TMP_REG1	(SLJIT_NUMBER_OF_REGISTERS + 2)
+#define TMP_REG1	(SLJIT_NUMBER_OF_REGISTERS + 3)
 
-static const sljit_u8 reg_map[SLJIT_NUMBER_OF_REGISTERS + 3] = {
-	0, 0, 2, 1, 0, 0, 0, 0, 0, 0, 7, 6, 3, 4, 5
+static const sljit_u8 reg_map[SLJIT_NUMBER_OF_REGISTERS + 4] = {
+	0, 0, 2, 1, 0, 0, 0, 0, 0, 0, 0, 6, 3, 4, 5, 7
 };
 
 #define CHECK_EXTRA_REGS(p, w, do) \
-	if (p >= SLJIT_R3 && p <= SLJIT_S3) { \
+	if (p >= SLJIT_R3 && p <= SLJIT_S2) { \
 		w = (2 * SSIZE_OF(sw)) + ((p) - SLJIT_R3) * SSIZE_OF(sw); \
-		p = SLJIT_MEM1(SLJIT_SP); \
+		p = SLJIT_MEM1(SLJIT_FRAMEP); \
 		do; \
 	}
 
@@ -1669,7 +1669,7 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_op1(struct sljit_compiler *compile
 
 #if (defined SLJIT_CONFIG_X86_32 && SLJIT_CONFIG_X86_32)
 		if (SLJIT_UNLIKELY(dst_is_ereg) && (!(op == SLJIT_MOV || op == SLJIT_MOV_U32 || op == SLJIT_MOV_S32 || op == SLJIT_MOV_P) || (src & SLJIT_MEM))) {
-			SLJIT_ASSERT(dst == SLJIT_MEM1(SLJIT_SP));
+			SLJIT_ASSERT(dst == SLJIT_MEM1(SLJIT_FRAMEP));
 			dst = TMP_REG1;
 		}
 #endif
@@ -1713,7 +1713,7 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_op1(struct sljit_compiler *compile
 
 #if (defined SLJIT_CONFIG_X86_32 && SLJIT_CONFIG_X86_32)
 		if (SLJIT_UNLIKELY(dst_is_ereg) && dst == TMP_REG1)
-			return emit_mov(compiler, SLJIT_MEM1(SLJIT_SP), dstw, TMP_REG1, 0);
+			return emit_mov(compiler, SLJIT_MEM1(SLJIT_FRAMEP), dstw, TMP_REG1, 0);
 #endif
 		return SLJIT_SUCCESS;
 	}
@@ -2338,7 +2338,7 @@ static sljit_s32 emit_shift(struct sljit_compiler *compiler,
 	   addressing, and this case must be supported as well. */
 	EMIT_MOV(compiler, TMP_REG1, 0, src1, src1w);
 #if (defined SLJIT_CONFIG_X86_32 && SLJIT_CONFIG_X86_32)
-	EMIT_MOV(compiler, SLJIT_MEM1(SLJIT_SP), 0, SLJIT_PREF_SHIFT_REG, 0);
+	EMIT_MOV(compiler, SLJIT_MEM1(SLJIT_FRAMEP), 0, SLJIT_PREF_SHIFT_REG, 0);
 #else /* !SLJIT_CONFIG_X86_32 */
 	mode32 = compiler->mode32;
 	compiler->mode32 = 0;
@@ -2352,7 +2352,7 @@ static sljit_s32 emit_shift(struct sljit_compiler *compiler,
 	*inst |= mode;
 
 #if (defined SLJIT_CONFIG_X86_32 && SLJIT_CONFIG_X86_32)
-	EMIT_MOV(compiler, SLJIT_PREF_SHIFT_REG, 0, SLJIT_MEM1(SLJIT_SP), 0);
+	EMIT_MOV(compiler, SLJIT_PREF_SHIFT_REG, 0, SLJIT_MEM1(SLJIT_FRAMEP), 0);
 #else
 	compiler->mode32 = 0;
 	EMIT_MOV(compiler, SLJIT_PREF_SHIFT_REG, 0, TMP_REG2, 0);
@@ -2523,7 +2523,7 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_shift_into(struct sljit_compiler *
 	sljit_u8* inst;
 	sljit_sw dstw = 0;
 #if (defined SLJIT_CONFIG_X86_32 && SLJIT_CONFIG_X86_32)
-	sljit_s32 tmp2 = SLJIT_MEM1(SLJIT_SP);
+	sljit_s32 tmp2 = SLJIT_MEM1(SLJIT_FRAMEP);
 #else /* !SLJIT_CONFIG_X86_32 */
 	sljit_s32 tmp2 = TMP_REG2;
 #endif /* SLJIT_CONFIG_X86_32 */
@@ -2660,7 +2660,7 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_get_register_index(sljit_s32 reg)
 {
 	CHECK_REG_INDEX(check_sljit_get_register_index(reg));
 #if (defined SLJIT_CONFIG_X86_32 && SLJIT_CONFIG_X86_32)
-	if (reg >= SLJIT_R3 && reg <= SLJIT_R8)
+	if (reg >= SLJIT_R3 && reg <= SLJIT_S2)
 		return -1;
 #endif
 	return reg_map[reg];
@@ -2754,8 +2754,11 @@ static SLJIT_INLINE sljit_s32 sljit_emit_fop1_conv_sw_from_f64(struct sljit_comp
 	sljit_s32 dst, sljit_sw dstw,
 	sljit_s32 src, sljit_sw srcw)
 {
-	sljit_s32 dst_r = FAST_IS_REG(dst) ? dst : TMP_REG1;
+	sljit_s32 dst_r;
 	sljit_u8 *inst;
+
+	CHECK_EXTRA_REGS(dst, dstw, (void) 0);
+	dst_r = FAST_IS_REG(dst) ? dst : TMP_REG1;
 
 #if (defined SLJIT_CONFIG_X86_64 && SLJIT_CONFIG_X86_64)
 	if (GET_OPCODE(op) == SLJIT_CONV_SW_FROM_F64)
@@ -2778,6 +2781,8 @@ static SLJIT_INLINE sljit_s32 sljit_emit_fop1_conv_f64_from_sw(struct sljit_comp
 {
 	sljit_s32 dst_r = FAST_IS_REG(dst) ? dst : TMP_FREG;
 	sljit_u8 *inst;
+
+	CHECK_EXTRA_REGS(src, srcw, (void) 0);
 
 #if (defined SLJIT_CONFIG_X86_64 && SLJIT_CONFIG_X86_64)
 	if (GET_OPCODE(op) == SLJIT_CONV_F64_FROM_SW)
@@ -3248,7 +3253,7 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_cmov(struct sljit_compiler *compil
 #if (defined SLJIT_CONFIG_X86_32 && SLJIT_CONFIG_X86_32)
 	type &= ~SLJIT_32;
 
-	if (!sljit_has_cpu_feature(SLJIT_HAS_CMOV) || (dst_reg >= SLJIT_R3 && dst_reg <= SLJIT_S3))
+	if (!sljit_has_cpu_feature(SLJIT_HAS_CMOV) || (dst_reg >= SLJIT_R3 && dst_reg <= SLJIT_S2))
 		return sljit_emit_cmov_generic(compiler, type, dst_reg, src, srcw);
 #else
 	if (!sljit_has_cpu_feature(SLJIT_HAS_CMOV))
@@ -3288,7 +3293,7 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_get_local_base(struct sljit_compiler *c
 	compiler->mode32 = 0;
 #endif
 
-	ADJUST_LOCAL_OFFSET(SLJIT_MEM1(SLJIT_FRAMEP), offset);
+	offset += SLJIT_LOCALS_OFFSET;
 
 #if (defined SLJIT_CONFIG_X86_64 && SLJIT_CONFIG_X86_64)
 	if (NOT_HALFWORD(offset)) {
