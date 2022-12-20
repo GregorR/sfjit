@@ -1882,8 +1882,8 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_set_alloca(struct sljit_compiler *compi
 	if (size > 0xffffffff)
 		abort();
 	sljit_ins *inst = (sljit_ins *) alloc->addr;
-	inst[0] = (inst[0] & 0xFFE0001F) | (((sljit_s32) size & 0xFFFF) << 5);
-	inst[1] = (inst[1] & 0xFFE0001F) | (((sljit_s32) size >> (16 - 5)) & 0xFFFF);
+	inst[0] = (inst[0] & 0xffe0001f) | (((sljit_s32) size & 0xffff) << 5);
+	inst[1] = (inst[1] & 0xffe0001f) | (((sljit_s32) size >> (16 - 5)) & 0xffff);
 	alloc->size = size;
 	return SLJIT_SUCCESS;
 }
