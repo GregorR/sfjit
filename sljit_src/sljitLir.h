@@ -455,6 +455,22 @@ struct sljit_compiler {
 	/* Executable size for statistical purposes. */
 	sljit_uw executable_size;
 
+	/* Number of word-y arguments that have thusfar been loaded */
+	sljit_s32 ma_words;
+
+	/* Space to remember any inversions */
+	sljit_u8 *ma_word_locs;
+
+	/* Number of float-y arguments that have thusfar been loaded */
+	sljit_s32 ma_floats;
+
+	/* Space to remember any inversions */
+	sljit_u8 *ma_float_locs;
+
+	/* Offset of the next stack-bound argument relative to the
+	 * frame pointer */
+	sljit_s32 ma_stack_offset;
+
 #if (defined SLJIT_HAS_STATUS_FLAGS_STATE && SLJIT_HAS_STATUS_FLAGS_STATE)
 	sljit_s32 status_flags_state;
 #endif
@@ -733,6 +749,21 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_cmp_info(sljit_s32 type);
 SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_enter(struct sljit_compiler *compiler,
 	sljit_s32 options, sljit_s32 arg_types, sljit_s32 scratches, sljit_s32 saveds,
 	sljit_s32 fscratches, sljit_s32 fsaveds, sljit_s32 local_size);
+
+/* Emit an enter for a multi-argument function. Takes only the return type as a
+ * type argument. */
+SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_enter_multiarg(struct sljit_compiler *compiler,
+	sljit_s32 options, sljit_s32 return_type, sljit_s32 scratches, sljit_s32 saveds,
+	sljit_s32 fscratches, sljit_s32 fsaveds, sljit_s32 local_size);
+
+/* When using multi-argument, use this to get the next argument. MUST BE DONE
+ * BEFORE ANY OTHER CODE. Takes a suggested location, which must be a register,
+ * for the argument, and pointers to where to store the actual location of the
+ * argument. The final location will either be your suggested location, or
+ * SLJIT_MEM1(SLJIT_FRAMEP) and an offset. */
+SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_get_marg(struct sljit_compiler *compiler,
+	sljit_s32 type, sljit_s32 sugg,
+	sljit_s32 *actual, sljit_s32 *actual_off);
 
 /* The SLJIT compiler has a current context (which contains the local
    stack space size, number of used registers, etc.) which is initialized

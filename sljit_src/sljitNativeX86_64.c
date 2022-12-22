@@ -553,8 +553,150 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_enter(struct sljit_compiler *compi
 	}
 #endif /* _WIN64 */
 
+	compiler->ma_stack_offset = saved_regs_size + local_size;
 	EMIT_MOV(compiler, SLJIT_FRAMEP, 0, SLJIT_STACKP, 0);
 
+	return SLJIT_SUCCESS;
+}
+
+SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_enter_multiarg(struct sljit_compiler *compiler,
+	sljit_s32 options, sljit_s32 return_type, sljit_s32 scratches, sljit_s32 saveds,
+	sljit_s32 fscratches, sljit_s32 fsaveds, sljit_s32 local_size)
+{
+	FAIL_IF(sljit_emit_enter(compiler, options,
+		SLJIT_ARG_RETURN(return_type), scratches, saveds, fscratches,
+		fsaveds, local_size));
+	compiler->ma_words = 0;
+	compiler->ma_floats = 0;
+	return SLJIT_SUCCESS;
+}
+
+SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_get_marg(struct sljit_compiler *compiler,
+	sljit_s32 type, sljit_s32 sugg,
+	sljit_s32 *actual, sljit_s32 *actual_off)
+{
+	sljit_s32 size;
+
+	if (compiler->ma_words < 0)
+		abort();
+
+	if (!compiler->ma_word_locs) {
+		compiler->ma_word_locs = ensure_abuf(compiler, SLJIT_NUMBER_OF_ARG_REGISTERS);
+		FAIL_IF_NULL(compiler->ma_word_locs);
+		compiler->ma_float_locs = ensure_abuf(compiler, SLJIT_NUMBER_OF_FLOAT_ARG_REGISTERS);
+		FAIL_IF_NULL(compiler->ma_float_locs);
+		memcpy(compiler->ma_word_locs, arg_regs, SLJIT_NUMBER_OF_ARG_REGISTERS);
+		memcpy(compiler->ma_float_locs, farg_regs, SLJIT_NUMBER_OF_FLOAT_ARG_REGISTERS);
+	}
+
+	switch (type) {
+		case SLJIT_ARG_TYPE_W:
+		case SLJIT_ARG_TYPE_32:
+		case SLJIT_ARG_TYPE_P:
+		{
+			sljit_s32 idx = compiler->ma_words;
+			sljit_s32 reg;
+			sljit_u8 *mc;
+
+			if (compiler->ma_words++ >= SLJIT_NUMBER_OF_ARG_REGISTERS)
+				break;
+			*actual = sugg;
+			*actual_off = 0;
+
+			/* It's a register argument. Find where it is. */
+			reg = compiler->ma_word_locs[idx];
+
+			/* And move it into place */
+			if (reg == sugg)
+				return SLJIT_SUCCESS;
+
+			/* Check for conflicts */
+			mc = memchr(compiler->ma_word_locs + idx,
+				sugg, SLJIT_NUMBER_OF_ARG_REGISTERS - (size_t) idx);
+			if (!mc) {
+				/* No conflicts, just move it into place */
+				SLJIT_SKIP_CHECKS(compiler);
+				FAIL_IF(sljit_emit_op1(
+					compiler, SLJIT_MOV,
+					sugg, 0, reg, 0));
+				//EMIT_MOV(compiler, sugg, 0, reg, 0);
+				return SLJIT_SUCCESS;
+			}
+
+			/* Conflict! Swap them */
+			*mc = (sljit_u8) reg;
+			SLJIT_SKIP_CHECKS(compiler);
+			FAIL_IF(sljit_emit_op2(
+				compiler, SLJIT_XOR,
+				sugg, 0, sugg, 0, reg, 0));
+			SLJIT_SKIP_CHECKS(compiler);
+			FAIL_IF(sljit_emit_op2(
+				compiler, SLJIT_XOR,
+				reg, 0, reg, 0, sugg, 0));
+			SLJIT_SKIP_CHECKS(compiler);
+			FAIL_IF(sljit_emit_op2(
+				compiler, SLJIT_XOR,
+				sugg, 0, sugg, 0, reg, 0));
+			return SLJIT_SUCCESS;
+		}
+
+		case SLJIT_ARG_TYPE_F64:
+		case SLJIT_ARG_TYPE_F32:
+		{
+			sljit_s32 idx = compiler->ma_floats;
+			sljit_s32 reg;
+			sljit_u8 *mc;
+
+			if (compiler->ma_floats++ >= SLJIT_NUMBER_OF_FLOAT_ARG_REGISTERS)
+				break;
+			*actual = sugg;
+			*actual_off = 0;
+
+			/* It's a register argument. Find where it is. */
+			reg = compiler->ma_float_locs[idx];
+
+			/* And move it into place */
+			if (reg == sugg)
+				return SLJIT_SUCCESS;
+
+			/* Check for conflicts */
+			mc = memchr(compiler->ma_float_locs + idx,
+				sugg, SLJIT_NUMBER_OF_FLOAT_ARG_REGISTERS - (size_t) idx);
+			if (!mc) {
+				SLJIT_SKIP_CHECKS(compiler);
+				FAIL_IF(sljit_emit_fop1(compiler, SLJIT_MOV_F64, sugg, 0, reg, 0));
+				return SLJIT_SUCCESS;
+			}
+
+			/* Conflict! Swap them, using the stack as temporary
+			 * space. */
+			*mc = (sljit_u8) reg;
+			SLJIT_SKIP_CHECKS(compiler);
+			FAIL_IF(sljit_emit_fop1(
+				compiler, SLJIT_MOV_F64,
+				SLJIT_MEM1(SLJIT_STACKP), -SSIZE_OF(f64),
+				sugg, 0));
+			SLJIT_SKIP_CHECKS(compiler);
+			FAIL_IF(sljit_emit_fop1(
+				compiler, SLJIT_MOV_F64,
+				sugg, 0, reg, 0));
+			SLJIT_SKIP_CHECKS(compiler);
+			FAIL_IF(sljit_emit_fop1(
+				compiler, SLJIT_MOV_F64,
+				reg, 0,
+				SLJIT_MEM1(SLJIT_STACKP), -SSIZE_OF(f64)));
+			return SLJIT_SUCCESS;
+		}
+
+		default:
+			abort();
+	}
+
+	/* It's in the stack */
+	size = 8;
+	*actual = SLJIT_MEM1(SLJIT_FRAMEP);
+	*actual_off = compiler->ma_stack_offset - SLJIT_LOCALS_OFFSET;
+	compiler->ma_stack_offset += size;
 	return SLJIT_SUCCESS;
 }
 

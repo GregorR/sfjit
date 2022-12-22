@@ -420,6 +420,12 @@ SLJIT_API_FUNC_ATTRIBUTE struct sljit_compiler* sljit_create_compiler(void *allo
 	compiler->fsaveds = -1;
 	compiler->local_size = -1;
 
+	compiler->ma_words = -1;
+	compiler->ma_word_locs = NULL;
+	compiler->ma_floats = -1;
+	compiler->ma_float_locs = NULL;
+	compiler->ma_stack_offset = -1;
+
 #if (defined SLJIT_CONFIG_X86_32 && SLJIT_CONFIG_X86_32)
 	compiler->args_size = -1;
 #endif
@@ -822,10 +828,7 @@ static sljit_s32 function_check_src_mem(struct sljit_compiler *compiler, sljit_s
 	if (!(p & SLJIT_MEM))
 		return 0;
 
-	if (p == SLJIT_MEM1(SLJIT_FRAMEP))
-		return (i < 0) || (i >= 0 && i < compiler->logical_local_size);
-
-	if (p == SLJIT_MEM1(SLJIT_STACKP))
+	if (p == SLJIT_MEM1(SLJIT_FRAMEP) || p == SLJIT_MEM1(SLJIT_STACKP))
 		return 1;
 
 	if (!(!(p & REG_MASK) || FUNCTION_CHECK_IS_REG(p & REG_MASK)))

@@ -86,6 +86,18 @@ union executable_code {
 
 	sljit_f32 (SLJIT_FUNC *test81_f1)(sljit_sw a);
 	sljit_f64 (SLJIT_FUNC *test81_f2)(sljit_sw a);
+
+	sljit_sw (SLJIT_FUNC *testa2_f1)(
+		sljit_sw a, sljit_s32 b, sljit_sw c, sljit_s32 d, sljit_sw e,
+		sljit_s32 f, sljit_sw g, sljit_s32 h, sljit_sw i, sljit_s32 j
+	);
+	sljit_f64 (SLJIT_FUNC *testa2_f2)(
+		sljit_sw a, sljit_f32 fa, sljit_s32 b, sljit_f64 fb, sljit_sw c,
+		sljit_f32 fc, sljit_s32 d, sljit_f64 fd, sljit_sw e,
+		sljit_f32 fe, sljit_s32 f, sljit_f64 ff, sljit_sw g,
+		sljit_f32 fg, sljit_s32 h, sljit_f64 fh, sljit_sw i,
+		sljit_f32 fi, sljit_s32 j, sljit_f64 fj
+	);
 };
 typedef union executable_code executable_code;
 
@@ -10717,6 +10729,186 @@ static void testa1(void)
 	successful_tests++;
 }
 
+static void testa2(void)
+{
+	/* Test for multi-argument functions */
+	executable_code code1, code2;
+	struct sljit_compiler* compiler;
+	sljit_s32 i, offset;
+	sljit_s32 locs[10], offs[10];
+	sljit_s32 flocs[10], foffs[10];
+	sljit_f64 res[20];
+
+	if (verbose)
+		printf("Run testa2\n");
+
+	/* Test 1 (no floats) */
+	compiler = sljit_create_compiler(NULL, NULL);
+	FAILED(!compiler, "cannot create compiler\n");
+
+	sljit_emit_enter_multiarg(compiler, 0, SLJIT_ARG_TYPE_W,
+		SLJIT_NUMBER_OF_ARG_REGISTERS ?
+			SLJIT_NUMBER_OF_ARG_REGISTERS + 1 : 2,
+		0, 0, 0, 0);
+
+	for (i = 0; i < 10; i += 2) {
+		sljit_emit_get_marg(compiler, SLJIT_ARG_TYPE_W, SLJIT_R(i+1), locs + i, offs + i);
+		sljit_emit_get_marg(compiler, SLJIT_ARG_TYPE_32, SLJIT_R(i+2), locs + i + 1, offs + i + 1);
+	}
+
+	sljit_emit_op1(compiler, SLJIT_MOV, SLJIT_R0, 0, locs[0], offs[0]);
+	for (i = 1; i < 9; i += 2) {
+		sljit_emit_op1(compiler, SLJIT_MOV_S32, SLJIT_R1, 0, locs[i], offs[i]);
+		sljit_emit_op2(compiler, SLJIT_ADD, SLJIT_R0, 0, SLJIT_R0, 0,
+			SLJIT_R1, 0);
+		sljit_emit_op2(compiler, SLJIT_SUB, SLJIT_R0, 0, SLJIT_R0, 0,
+			locs[i+1], offs[i+1]);
+	}
+	sljit_emit_op2(compiler, SLJIT_MUL, SLJIT_R0, 0, SLJIT_R0, 0,
+		locs[9], offs[9]);
+
+	sljit_emit_return(compiler, SLJIT_MOV, SLJIT_R0, 0);
+
+	code1.code = sljit_generate_code(compiler);
+	CHECK(compiler);
+	sljit_free_compiler(compiler);
+
+	/* Test 2 (floats) */
+	compiler = sljit_create_compiler(NULL, NULL);
+	FAILED(!compiler, "cannot create compiler\n");
+
+	sljit_emit_enter_multiarg(compiler, 0, SLJIT_ARG_TYPE_VOID,
+		SLJIT_NUMBER_OF_ARG_REGISTERS + 1, 0,
+		SLJIT_NUMBER_OF_FLOAT_ARG_REGISTERS + 1, 0, 0);
+
+	for (i = 0; i < 10; i += 2) {
+		sljit_emit_get_marg(compiler, SLJIT_ARG_TYPE_W, SLJIT_R(i+1),
+			locs + i, offs + i);
+		sljit_emit_get_marg(compiler, SLJIT_ARG_TYPE_F32, SLJIT_FR(i+1),
+			flocs + i, foffs + i);
+		sljit_emit_get_marg(compiler, SLJIT_ARG_TYPE_32, SLJIT_R(i+2),
+			locs + i + 1, offs + i + 1);
+		sljit_emit_get_marg(compiler, SLJIT_ARG_TYPE_F64, SLJIT_FR(i+2),
+			flocs + i + 1, foffs + i + 1);
+	}
+
+	sljit_emit_op1(compiler, SLJIT_MOV, SLJIT_R0, 0, SLJIT_IMM, (sljit_sw) res);
+	offset = 0;
+	for (i = 0; i < 10; i += 2) {
+		sljit_emit_fop1(compiler, SLJIT_CONV_F64_FROM_SW, SLJIT_FR0, 0,
+			locs[i], offs[i]);
+		sljit_emit_fop1(compiler, SLJIT_MOV_F64, SLJIT_MEM1(SLJIT_R0), offset,
+			SLJIT_FR0, 0);
+		offset += (sljit_s32) sizeof(sljit_f64);
+
+		sljit_emit_fop1(compiler, SLJIT_CONV_F64_FROM_F32, SLJIT_FR0, 0,
+			flocs[i], foffs[i]);
+		sljit_emit_fop1(compiler, SLJIT_MOV_F64, SLJIT_MEM1(SLJIT_R0), offset,
+			SLJIT_FR0, 0);
+		offset += (sljit_s32) sizeof(sljit_f64);
+
+		sljit_emit_fop1(compiler, SLJIT_CONV_F64_FROM_S32, SLJIT_FR0, 0,
+			locs[i+1], offs[i+1]);
+		sljit_emit_fop1(compiler, SLJIT_MOV_F64, SLJIT_MEM1(SLJIT_R0), offset,
+			SLJIT_FR0, 0);
+		offset += (sljit_s32) sizeof(sljit_f64);
+
+		sljit_emit_fop1(compiler, SLJIT_MOV_F64, SLJIT_FR0, 0,
+			flocs[i+1], foffs[i+1]);
+		sljit_emit_fop1(compiler, SLJIT_MOV_F64, SLJIT_MEM1(SLJIT_R0), offset,
+			SLJIT_FR0, 0);
+		offset += (sljit_s32) sizeof(sljit_f64);
+	}
+
+	sljit_emit_return_void(compiler);
+
+	code2.code = sljit_generate_code(compiler);
+	CHECK(compiler);
+	sljit_free_compiler(compiler);
+
+	FAILED(
+		code1.testa2_f1(
+			851842,
+			-202516,
+			-926541,
+			946114,
+			-605596,
+			757116,
+			383969,
+			-887514,
+			-549260,
+			-136
+		) != -430095920,
+		"testa2 case 1 failed\n"
+	);
+
+#if (defined SLJIT_64BIT_ARCHITECTURE && SLJIT_64BIT_ARCHITECTURE)
+	FAILED(
+		code1.testa2_f1(
+			85184216,
+			-20251648,
+			-92654160,
+			94611487,
+			-60559668,
+			75711612,
+			38396976,
+			-88751410,
+			-54926045,
+			-1367
+		) != -432309859518L,
+		"testa2 case 2 failed\n"
+	);
+#endif
+
+	code2.testa2_f2(
+		85184216,
+		1481955.125,
+		-20251648,
+		-6034305.5,
+		-92654160,
+		2971148.25,
+		94611487,
+		-8367898.5,
+		-60559668,
+		-1791444.125,
+		75711612,
+		-7172975.375,
+		38396976,
+		-661649.875,
+		-88751410,
+		8365837.875,
+		-54926045,
+		1607258.625,
+		-1367,
+		-9981201
+	);
+
+	FAILED(res[0] != 85184216, "testa2 case 3 failed\n");
+	FAILED(res[1] != 1481955.125, "testa2 case 4 failed\n");
+	FAILED(res[2] != -20251648, "testa2 case 5 failed\n");
+	FAILED(res[3] != -6034305.5, "testa2 case 6 failed\n");
+	FAILED(res[4] != -92654160, "testa2 case 7 failed\n");
+	FAILED(res[5] != 2971148.25, "testa2 case 8 failed\n");
+	FAILED(res[6] != 94611487, "testa2 case 9 failed\n");
+	FAILED(res[7] != -8367898.5, "testa2 case 10 failed\n");
+	FAILED(res[8] != -60559668, "testa2 case 11 failed\n");
+	FAILED(res[9] != -1791444.125, "testa2 case 12 failed\n");
+	FAILED(res[10] != 75711612, "testa2 case 13 failed\n");
+	FAILED(res[11] != -7172975.375, "testa2 case 14 failed\n");
+	FAILED(res[12] != 38396976, "testa2 case 15 failed\n");
+	FAILED(res[13] != -661649.875, "testa2 case 16 failed\n");
+	FAILED(res[14] != -88751410, "testa2 case 17 failed\n");
+	FAILED(res[15] != 8365837.875, "testa2 case 18 failed\n");
+	FAILED(res[16] != -54926045, "testa2 case 19 failed\n");
+	FAILED(res[17] != 1607258.625, "testa2 case 20 failed\n");
+	FAILED(res[18] != -1367, "testa2 case 21 failed\n");
+	FAILED(res[19] != -9981201, "testa2 case 22 failed\n");
+
+
+	sljit_free_code(code1.code, NULL);
+	sljit_free_code(code2.code, NULL);
+	successful_tests++;
+}
 #undef WCONST
 
 int sljit_test(int argc, char* argv[])
@@ -10818,12 +11010,13 @@ int sljit_test(int argc, char* argv[])
 	test85();
 
 	testa1();
+	testa2();
 
 #if (defined SLJIT_EXECUTABLE_ALLOCATOR && SLJIT_EXECUTABLE_ALLOCATOR)
 	sljit_free_unused_memory_exec();
 #endif
 
-#	define TEST_COUNT 85 + 1
+#	define TEST_COUNT 85 + 2
 
 	printf("SLJIT tests: ");
 	if (successful_tests == TEST_COUNT)

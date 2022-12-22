@@ -97,6 +97,11 @@ static const sljit_u8 reg_map[SLJIT_NUMBER_OF_REGISTERS + 5] = {
 static const sljit_u8 reg_lmap[SLJIT_NUMBER_OF_REGISTERS + 5] = {
 	0, 0, 6, 7, 1, 0, 3,  2,  4,  5,  6,  7, 3, 4,  5, 2, 1
 };
+/* Argument registers */
+static const sljit_u8 arg_regs[SLJIT_NUMBER_OF_ARG_REGISTERS] = {
+	// 7, 6, 2, 1, 8, 9
+	3, 2, TMP_REG1, 4, 5, TMP_REG2
+};
 #else
 /* Args: rcx(=1), rdx(=2), r8, r9. Scratches: rax(=0), r10, r11 */
 static const sljit_u8 reg_map[SLJIT_NUMBER_OF_REGISTERS + 5] = {
@@ -106,15 +111,22 @@ static const sljit_u8 reg_map[SLJIT_NUMBER_OF_REGISTERS + 5] = {
 static const sljit_u8 reg_lmap[SLJIT_NUMBER_OF_REGISTERS + 5] = {
 	0, 0, 2, 0, 1,  3,  4,  5,  6,  7, 7, 6, 3, 4, 5, 1,  2
 };
+static const sljit_u8 arg_regs[SLJIT_NUMBER_OF_ARG_REGISTERS] = {
+	1, 2, 8, 9
+};
 #endif
 
-/* Args: xmm0-xmm3 */
-static const sljit_u8 freg_map[SLJIT_NUMBER_OF_FLOAT_REGISTERS + 1] = {
-	4, 0, 1, 2, 3, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15
+/* Args: xmm0-xmm7 */
+static const sljit_u8 freg_map[SLJIT_NUMBER_OF_FLOAT_REGISTERS + 2] = {
+	4, 0, 1, 2, 3, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 4
 };
 /* low-map. freg_map & 0x7. */
-static const sljit_u8 freg_lmap[SLJIT_NUMBER_OF_FLOAT_REGISTERS + 1] = {
-	4, 0, 1, 2, 3, 5, 6, 7, 0, 1, 2,  3,  4,  5,  6,  7
+static const sljit_u8 freg_lmap[SLJIT_NUMBER_OF_FLOAT_REGISTERS + 2] = {
+	4, 0, 1, 2, 3, 5, 6, 7, 0, 1, 2,  3,  4,  5,  6,  7, 4
+};
+
+static const sljit_u8 farg_regs[SLJIT_NUMBER_OF_FLOAT_ARG_REGISTERS] = {
+	1, 2, 3, 4, SLJIT_NUMBER_OF_FLOAT_REGISTERS + 1, 5, 6, 7
 };
 
 #define REX_W		0x48
@@ -2407,6 +2419,10 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_op2(struct sljit_compiler *compile
 	sljit_s32 src2, sljit_sw src2w)
 {
 	CHECK_ERROR();
+
+	if (!SLJIT_UNLIKELY(compiler->skip_checks))
+		CHECK_ARGUMENT(dst != TMP_REG1 || HAS_FLAGS(op));
+
 	CHECK(check_sljit_emit_op2(compiler, op, 0, dst, dstw, src1, src1w, src2, src2w));
 	ADJUST_LOCAL_OFFSET(dst, dstw);
 	ADJUST_LOCAL_OFFSET(src1, src1w);
@@ -2418,8 +2434,6 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_op2(struct sljit_compiler *compile
 #if (defined SLJIT_CONFIG_X86_64 && SLJIT_CONFIG_X86_64)
 	compiler->mode32 = op & SLJIT_32;
 #endif
-
-	SLJIT_ASSERT(dst != TMP_REG1 || HAS_FLAGS(op));
 
 	switch (GET_OPCODE(op)) {
 	case SLJIT_ADD:
