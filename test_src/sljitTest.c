@@ -10732,11 +10732,13 @@ static void testa1(void)
 static void testa2(void)
 {
 	/* Test for multi-argument functions */
-	executable_code code1, code2;
+	executable_code code1, code2, code3;
 	struct sljit_compiler* compiler;
+	sljit_u32 u;
 	sljit_s32 i, offset;
-	sljit_s32 locs[10], offs[10];
-	sljit_s32 flocs[10], foffs[10];
+	sljit_s32 locs[10], flocs[10];
+	sljit_sw offs[10], foffs[10];
+	struct sljit_marg* marg;
 	sljit_f64 res[20];
 
 	if (verbose)
@@ -10826,6 +10828,88 @@ static void testa2(void)
 	CHECK(compiler);
 	sljit_free_compiler(compiler);
 
+	/* Test 3, calling multi-arg functions. Start with making the type */
+	compiler = sljit_create_compiler(NULL, NULL);
+	FAILED(!compiler, "cannot create compiler\n");
+
+	marg = sljit_marg_arg(compiler, NULL, SLJIT_ARG_TYPE_VOID);
+	for (i = 0; i < 10; i += 2) {
+		marg = sljit_marg_arg(compiler, marg, SLJIT_ARG_TYPE_W);
+		marg = sljit_marg_arg(compiler, marg, SLJIT_ARG_TYPE_F32);
+		marg = sljit_marg_arg(compiler, marg, SLJIT_ARG_TYPE_32);
+		marg = sljit_marg_arg(compiler, marg, SLJIT_ARG_TYPE_F64);
+	}
+
+	sljit_emit_enter(compiler, 0, SLJIT_ARGS0(VOID),
+		SLJIT_NUMBER_OF_REGISTERS, 0,
+		SLJIT_NUMBER_OF_FLOAT_REGISTERS, 0, sizeof(sljit_sw));
+
+	{
+		sljit_s32 argr, fargr, ssize;
+
+		/* Get the argument info */
+		sljit_marg_properties(compiler, marg, &argr, &fargr, &ssize);
+		if (ssize)
+			sljit_emit_alloca(compiler, (sljit_uw) ssize);
+
+		/* Push the arguments one by one */
+		u = 0;
+		while (u < 10) {
+			i = (sljit_s32) u;
+			if (i < argr) {
+				sljit_emit_op1(compiler, SLJIT_MOV,
+					SLJIT_R(i), 0, SLJIT_IMM, 12345600 + i);
+			} else {
+				sljit_emit_marg_mov(compiler, marg, u*2,
+					SLJIT_IMM, 12345600 + i);
+			}
+			if (i < fargr) {
+				sljit_emit_fop1(compiler, SLJIT_CONV_F32_FROM_SW,
+					SLJIT_FR(i), 0, SLJIT_IMM, 12345600 + i);
+			} else {
+				sljit_emit_fop1(compiler, SLJIT_CONV_F32_FROM_SW,
+					SLJIT_FR(fargr), 0, SLJIT_IMM, 12345600 + i);
+				sljit_emit_marg_mov(compiler, marg, u*2+1,
+					SLJIT_FR(fargr), 0);
+			}
+			u++; i = (sljit_s32) u;
+			if (i < argr) {
+				sljit_emit_op1(compiler, SLJIT_MOV32,
+					SLJIT_R(i), 0, SLJIT_IMM, 12345600 + i);
+			} else {
+				sljit_emit_marg_mov(compiler, marg, u*2,
+					SLJIT_IMM, 12345600 + i);
+			}
+			if (i < fargr) {
+				sljit_emit_fop1(compiler, SLJIT_CONV_F64_FROM_SW,
+					SLJIT_FR(i), 0, SLJIT_IMM, 12345600 + i);
+			} else {
+				sljit_emit_fop1(compiler, SLJIT_CONV_F64_FROM_SW,
+					SLJIT_FR(fargr), 0, SLJIT_IMM, 12345600 + i);
+				sljit_emit_marg_mov(compiler, marg, u*2+1,
+					SLJIT_FR(fargr), 0);
+			}
+			u++;
+		}
+
+		/* To make it a trickier case, get it into the stack */
+		sljit_emit_op1(compiler, SLJIT_MOV, SLJIT_MEM1(SLJIT_FRAMEP), 0,
+			SLJIT_IMM, SLJIT_FUNC_ADDR(code2.code));
+
+		/* Make the call */
+		sljit_emit_icall_multiarg(compiler, marg,
+			SLJIT_MEM1(SLJIT_FRAMEP), 0);
+
+		if (ssize)
+			sljit_emit_pop(compiler, (sljit_uw) ssize);
+	}
+
+	sljit_emit_return_void(compiler);
+
+	code3.code = sljit_generate_code(compiler);
+	CHECK(compiler);
+	sljit_free_compiler(compiler);
+
 	FAILED(
 		code1.testa2_f1(
 			851842,
@@ -10904,9 +10988,32 @@ static void testa2(void)
 	FAILED(res[18] != -1367, "testa2 case 21 failed\n");
 	FAILED(res[19] != -9981201, "testa2 case 22 failed\n");
 
+	code3.func0();
+
+	FAILED(res[0] != 12345600, "testa2 case 23 failed\n");
+	FAILED(res[1] != 12345600, "testa2 case 24 failed\n");
+	FAILED(res[2] != 12345601, "testa2 case 25 failed\n");
+	FAILED(res[3] != 12345601, "testa2 case 26 failed\n");
+	FAILED(res[4] != 12345602, "testa2 case 27 failed\n");
+	FAILED(res[5] != 12345602, "testa2 case 28 failed\n");
+	FAILED(res[6] != 12345603, "testa2 case 29 failed\n");
+	FAILED(res[7] != 12345603, "testa2 case 30 failed\n");
+	FAILED(res[8] != 12345604, "testa2 case 31 failed\n");
+	FAILED(res[9] != 12345604, "testa2 case 32 failed\n");
+	FAILED(res[10] != 12345605, "testa2 case 33 failed\n");
+	FAILED(res[11] != 12345605, "testa2 case 34 failed\n");
+	FAILED(res[12] != 12345606, "testa2 case 35 failed\n");
+	FAILED(res[13] != 12345606, "testa2 case 36 failed\n");
+	FAILED(res[14] != 12345607, "testa2 case 37 failed\n");
+	FAILED(res[15] != 12345607, "testa2 case 38 failed\n");
+	FAILED(res[16] != 12345608, "testa2 case 39 failed\n");
+	FAILED(res[17] != 12345608, "testa2 case 40 failed\n");
+	FAILED(res[18] != 12345609, "testa2 case 41 failed\n");
+	FAILED(res[19] != 12345609, "testa2 case 42 failed\n");
 
 	sljit_free_code(code1.code, NULL);
 	sljit_free_code(code2.code, NULL);
+	sljit_free_code(code3.code, NULL);
 	successful_tests++;
 }
 #undef WCONST

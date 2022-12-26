@@ -112,7 +112,7 @@ static const sljit_u8 reg_lmap[SLJIT_NUMBER_OF_REGISTERS + 5] = {
 	0, 0, 2, 0, 1,  3,  4,  5,  6,  7, 7, 6, 3, 4, 5, 1,  2
 };
 static const sljit_u8 arg_regs[SLJIT_NUMBER_OF_ARG_REGISTERS] = {
-	1, 2, 8, 9
+	4, 2, 3, TMP_REG1
 };
 #endif
 

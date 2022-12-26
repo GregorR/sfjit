@@ -2658,6 +2658,33 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_get_local_base(struct sljit_compiler *c
 
 #endif
 
+SLJIT_API_FUNC_ATTRIBUTE struct sljit_marg *sljit_marg_arg(struct sljit_compiler *compiler, struct sljit_marg *prev, sljit_s32 type)
+{
+	struct sljit_marg *ret;
+
+	if (!prev) {
+		if (!compiler->margs) {
+			compiler->margs =
+				ensure_abuf(compiler, sizeof(struct sljit_marg));
+			PTR_FAIL_IF_NULL(compiler->margs);
+			memset(compiler->margs, 0, sizeof(struct sljit_marg));
+		}
+		prev = compiler->margs;
+	}
+
+	if (prev->next[type])
+		return prev->next[type];
+
+	ret = prev->next[type] =
+		ensure_abuf(compiler, sizeof(struct sljit_marg) + prev->ct);
+	PTR_FAIL_IF_NULL(ret);
+	memset(ret, 0, sizeof(struct sljit_marg));
+	ret->ct = prev->ct + 1;
+	memcpy(ret->args, prev->args, prev->ct);
+	ret->args[prev->ct] = (sljit_u8) type;
+	return ret;
+}
+
 #else /* SLJIT_CONFIG_UNSUPPORTED */
 
 /* Empty function bodies for those machines, which are not (yet) supported. */
