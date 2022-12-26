@@ -356,7 +356,7 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_enter(struct sljit_compiler *compi
 
 	word_arg_count = 0;
 	saved_arg_count = 0;
-	args_size = local_size + size;
+	compiler->ma_stack_offset = args_size = local_size + size;
 
 	SLJIT_ASSERT(SLJIT_LOCALS_OFFSET > 0);
 
@@ -443,6 +443,37 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_enter(struct sljit_compiler *compi
 		arg_types >>= SLJIT_ARG_SHIFT;
 	}
 
+	return SLJIT_SUCCESS;
+}
+
+SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_enter_multiarg(struct sljit_compiler *compiler,
+	sljit_s32 options, sljit_s32 return_type, sljit_s32 scratches, sljit_s32 saveds,
+	sljit_s32 fscratches, sljit_s32 fsaveds, sljit_s32 local_size)
+{
+	FAIL_IF(sljit_emit_enter(
+		compiler, options, SLJIT_ARG_RETURN(return_type), scratches,
+		saveds, fscratches, fsaveds, local_size));
+	compiler->ma_words = 0;
+	compiler->ma_floats = 0;
+	return SLJIT_SUCCESS;
+}
+
+SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_get_marg(struct sljit_compiler *compiler,
+	sljit_s32 type, sljit_s32 sugg,
+	sljit_s32 *actual, sljit_sw *actual_off)
+{
+	if (compiler->ma_words < 0)
+		abort();
+
+	(void) sugg;
+
+	/* All arguments are on the stack */
+	*actual = SLJIT_MEM1(SLJIT_FRAMEP);
+	*actual_off = compiler->ma_stack_offset - SLJIT_LOCALS_OFFSET;
+	if (type == SLJIT_ARG_TYPE_F64)
+		compiler->ma_stack_offset += SSIZE_OF(f64);
+	else
+		compiler->ma_stack_offset += SSIZE_OF(sw);
 	return SLJIT_SUCCESS;
 }
 
@@ -1209,6 +1240,103 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_pop(struct sljit_compiler *compile
 	sljit_u8 *inst;
 	size = (size + 0x7UL) & ~0x7UL;
 	BINARY_IMM32(ADD, (sljit_sw) size, SLJIT_STACKP, 0);
+	return SLJIT_SUCCESS;
+}
+
+SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_marg_properties(
+	struct sljit_compiler *compiler, struct sljit_marg *marg,
+	sljit_s32 *word_regs, sljit_s32 *float_regs, sljit_s32 *stack_space
+) {
+	sljit_s32 s = 0;
+	sljit_u32 u;
+
+	(void) compiler;
+
+	for (u = 1; u < marg->ct; u++) {
+		if (marg->args[u] == SLJIT_ARG_TYPE_F64)
+			s += SSIZE_OF(f64);
+		else
+			s += SSIZE_OF(sw);
+	}
+
+	*word_regs = 0;
+	*float_regs = 0;
+	*stack_space = s;
+	return SLJIT_SUCCESS;
+}
+
+SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_marg_mov(
+	struct sljit_compiler *compiler, struct sljit_marg *marg, sljit_u32 idx,
+	sljit_s32 src, sljit_sw srcw
+) {
+	sljit_s32 s = 0;
+	sljit_u32 u;
+
+	for (u = 0; u < marg->ct - 1; u++) {
+		sljit_u8 type = marg->args[u+1];
+		if (u == idx) {
+			/* Reached the index */
+			sljit_s32 op = SLJIT_MOV;
+			if (type == SLJIT_ARG_TYPE_F64)
+				op = SLJIT_MOV_F64;
+			else if (type == SLJIT_ARG_TYPE_F32)
+				op = SLJIT_MOV_F32;
+			if (type < SLJIT_ARG_TYPE_F64) {
+				FAIL_IF(sljit_emit_op1(compiler, op,
+					SLJIT_MEM1(SLJIT_STACKP), s,
+					src, srcw));
+			} else {
+				FAIL_IF(sljit_emit_fop1(compiler, op,
+					SLJIT_MEM1(SLJIT_STACKP), s,
+					src, srcw));
+			}
+			return SLJIT_SUCCESS;
+		}
+		if (type == SLJIT_ARG_TYPE_F64)
+			s += SSIZE_OF(f64);
+		else
+			s += SSIZE_OF(sw);
+	}
+
+	return SLJIT_ERR_BAD_ARGUMENT;
+}
+
+SLJIT_API_FUNC_ATTRIBUTE struct sljit_jump* sljit_emit_call_multiarg(
+	struct sljit_compiler *compiler, struct sljit_marg *marg
+) {
+	struct sljit_jump *jump;
+
+	(void) marg;
+
+	CHECK_ERROR_PTR();
+
+	SLJIT_SKIP_CHECKS(compiler);
+	jump = sljit_emit_jump(compiler, SLJIT_CALL);
+	PTR_FAIL_IF(jump == NULL);
+
+	return jump;
+}
+
+SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_icall_multiarg(
+	struct sljit_compiler *compiler, struct sljit_marg *marg,
+	sljit_s32 src, sljit_sw srcw
+) {
+	(void) marg;
+
+	CHECK_ERROR();
+
+	ADJUST_LOCAL_OFFSET(src, srcw);
+	CHECK_EXTRA_REGS(src, srcw, (void)0);
+
+	if (src & SLJIT_MEM) {
+		EMIT_MOV(compiler, TMP_REG1, 0, src, srcw);
+		src = TMP_REG1;
+		srcw = 0;
+	}
+
+	SLJIT_SKIP_CHECKS(compiler);
+	FAIL_IF(sljit_emit_ijump(compiler, SLJIT_CALL, src, srcw));
+
 	return SLJIT_SUCCESS;
 }
 

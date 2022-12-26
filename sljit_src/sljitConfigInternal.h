@@ -67,9 +67,11 @@ extern "C" {
      SLJIT_NUMBER_OF_REGISTERS : number of available registers
      SLJIT_NUMBER_OF_SCRATCH_REGISTERS : number of available scratch registers
      SLJIT_NUMBER_OF_SAVED_REGISTERS : number of available saved registers
+     SLJIT_NUMBER_OF_ARG_REGISTERS : number of registers used for word arguments, used for multi-argument calls
      SLJIT_NUMBER_OF_FLOAT_REGISTERS : number of available floating point registers
      SLJIT_NUMBER_OF_SCRATCH_FLOAT_REGISTERS : number of available floating point scratch registers
      SLJIT_NUMBER_OF_SAVED_FLOAT_REGISTERS : number of available floating point saved registers
+     SLJIT_NUMBER_OF_FLOAT_ARG_REGISTERS : number of registers used for float arguments, used for multi-argument calls
      SLJIT_WORD_SHIFT : the shift required to apply when accessing a sljit_sw/sljit_uw array by index
      SLJIT_F32_SHIFT : the shift required to apply when accessing
                        a single precision floating point array by index
@@ -649,8 +651,10 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_sw sljit_exec_offset(void* ptr);
 
 #define SLJIT_NUMBER_OF_REGISTERS 12
 #define SLJIT_NUMBER_OF_SAVED_REGISTERS 7
+#define SLJIT_NUMBER_OF_ARG_REGISTERS 0
 #define SLJIT_NUMBER_OF_FLOAT_REGISTERS 7
 #define SLJIT_NUMBER_OF_SAVED_FLOAT_REGISTERS 0
+#define SLJIT_NUMBER_OF_FLOAT_ARG_REGISTERS 0
 #define SLJIT_LOCALS_OFFSET_BASE (9 * SSIZE_OF(sw))
 #define SLJIT_PREF_SHIFT_REG SLJIT_R2
 

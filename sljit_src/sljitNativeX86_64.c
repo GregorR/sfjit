@@ -575,8 +575,6 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_get_marg(struct sljit_compiler *co
 	sljit_s32 type, sljit_s32 sugg,
 	sljit_s32 *actual, sljit_sw *actual_off)
 {
-	sljit_s32 size;
-
 	if (compiler->ma_words < 0)
 		abort();
 
@@ -693,10 +691,9 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_get_marg(struct sljit_compiler *co
 	}
 
 	/* It's in the stack */
-	size = 8;
 	*actual = SLJIT_MEM1(SLJIT_FRAMEP);
 	*actual_off = compiler->ma_stack_offset - SLJIT_LOCALS_OFFSET;
-	compiler->ma_stack_offset += size;
+	compiler->ma_stack_offset += SSIZE_OF(sw);
 	return SLJIT_SUCCESS;
 }
 

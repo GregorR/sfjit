@@ -11016,6 +11016,7 @@ static void testa2(void)
 	sljit_free_code(code3.code, NULL);
 	successful_tests++;
 }
+
 #undef WCONST
 
 int sljit_test(int argc, char* argv[])
