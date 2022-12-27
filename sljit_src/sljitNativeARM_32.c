@@ -68,10 +68,14 @@ static const sljit_u8 freg_map[SLJIT_NUMBER_OF_FLOAT_REGISTERS + 3] = {
 	0, 0, 1, 2, 3, 4, 5, 15, 14, 13, 12, 11, 10, 9, 8, 6, 7
 };
 
+#ifdef __SOFTFP__
+#define FLOAT_ARG_REGS SLJIT_NUMBER_OF_ARG_REGISTERS
+#else
 #define FLOAT_ARG_REGS 8
 static const sljit_u8 farg_regs[FLOAT_ARG_REGS] = {
 	1, 2, 3, 4, 5, 6, TMP_FREG1, TMP_FREG2
 };
+#endif
 
 #define RM(rm) ((sljit_uw)reg_map[rm])
 #define RM8(rm) ((sljit_uw)reg_map[rm] << 8)
@@ -1234,18 +1238,25 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_enter_multiarg(struct sljit_compil
 	sljit_s32 options, sljit_s32 return_type, sljit_s32 scratches, sljit_s32 saveds,
 	sljit_s32 fscratches, sljit_s32 fsaveds, sljit_s32 local_size)
 {
+#ifndef __SOFTFP__
 	sljit_s32 i, fo;
+#endif
 
 	/* Make room for the floats */
 	local_size = (local_size + 0x7) & ~0x7;
 	compiler->ma_float_offset = local_size;
+#ifdef __SOFTFP__
+	local_size += FLOAT_ARG_REGS * SSIZE_OF(f32);
+#else
 	local_size += FLOAT_ARG_REGS * SSIZE_OF(f64);
+#endif
 	FAIL_IF(sljit_emit_enter(compiler, options,
 		SLJIT_ARG_RETURN(return_type), scratches, saveds, fscratches,
 		fsaveds, local_size));
 	compiler->ma_words = 0;
 	compiler->ma_floats = 0;
 
+#ifndef __SOFTFP__
 	/* Copy our floats below the stack as a temporary spot */
 	fo = compiler->ma_float_offset;
 	for (i = 0; i < FLOAT_ARG_REGS; i++) {
@@ -1254,6 +1265,7 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_enter_multiarg(struct sljit_compil
 			SLJIT_MEM1(SLJIT_FRAMEP), fo + i * SSIZE_OF(f64),
 			farg_regs[i], 0));
 	}
+#endif
 
 	return SLJIT_SUCCESS;
 }
@@ -1272,13 +1284,15 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_get_marg(struct sljit_compiler *co
 		compiler->ma_word_locs =
 			ensure_abuf(compiler, SLJIT_NUMBER_OF_ARG_REGISTERS);
 		FAIL_IF_NULL(compiler->ma_word_locs);
+		for (u = 0; u < SLJIT_NUMBER_OF_ARG_REGISTERS; u++)
+			compiler->ma_word_locs[u] = u + 1;
+#ifndef __SOFTFP__
 		compiler->ma_float_locs =
 			ensure_abuf(compiler, FLOAT_ARG_REGS * 2);
 		FAIL_IF_NULL(compiler->ma_float_locs);
-		for (u = 0; u < SLJIT_NUMBER_OF_ARG_REGISTERS; u++)
-			compiler->ma_word_locs[u] = u + 1;
 		for (u = 0; u < FLOAT_ARG_REGS * 2; u++)
 			compiler->ma_float_locs[u] = 0;
+#endif
 	}
 
 	switch (type) {
@@ -1331,6 +1345,29 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_get_marg(struct sljit_compiler *co
 			return SLJIT_SUCCESS;
 		}
 
+#ifdef __SOFTFP__
+		case SLJIT_ARG_TYPE_F32:
+		{
+			sljit_s32 idx = compiler->ma_words;
+
+			if (compiler->ma_words++ >= SLJIT_NUMBER_OF_ARG_REGISTERS)
+				break;
+
+			/* Copy this into the float space */
+			*actual = SLJIT_MEM1(SLJIT_FRAMEP);
+			*actual_off = compiler->ma_float_offset;
+			compiler->ma_float_offset += SSIZE_OF(f32);
+			SLJIT_SKIP_CHECKS(compiler);
+			FAIL_IF(sljit_emit_fop1(compiler, SLJIT_MOV,
+				*actual, *actual_off,
+				compiler->ma_word_locs[idx], 0));
+			return SLJIT_SUCCESS;
+		}
+
+		case SLJIT_ARG_TYPE_F64:
+			break;
+
+#else /* !__SOFTFP__ */
 		case SLJIT_ARG_TYPE_F64:
 		case SLJIT_ARG_TYPE_F32:
 		{
@@ -1368,16 +1405,20 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_get_marg(struct sljit_compiler *co
 				compiler->ma_float_offset + idx * SSIZE_OF(f32);
 			return SLJIT_SUCCESS;
 		}
+#endif
 
 		default:
 			abort();
 	}
 
 	/* It's in the stack */
-	if (type == SLJIT_ARG_TYPE_F64)
+	if (type == SLJIT_ARG_TYPE_F64) {
 		size = SSIZE_OF(f64);
-	else
+		compiler->ma_stack_offset =
+			(compiler->ma_stack_offset + 0x7) & ~0x7;
+	} else {
 		size = SSIZE_OF(sw);
+	}
 	*actual = SLJIT_MEM1(SLJIT_FRAMEP);
 	*actual_off = compiler->ma_stack_offset - SLJIT_LOCALS_OFFSET;
 	compiler->ma_stack_offset += size;
@@ -2917,6 +2958,7 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_marg_mov(
 	return SLJIT_SUCCESS;
 }
 
+#ifndef __SOFTFP__
 static sljit_s32 mov_float_args(struct sljit_compiler *compiler)
 {
 	/* float arguments are stored *below* the stack pointer temporarily, and
@@ -2934,17 +2976,22 @@ static sljit_s32 mov_float_args(struct sljit_compiler *compiler)
 
 	return SLJIT_SUCCESS;
 }
+#endif
 
 SLJIT_API_FUNC_ATTRIBUTE struct sljit_jump *sljit_emit_call_multiarg(struct sljit_compiler *compiler, struct sljit_marg *marg)
 {
+#ifndef __SOFTFP__
 	PTR_FAIL_IF(mov_float_args(compiler));
+#endif
 	return sljit_emit_call(compiler, SLJIT_CALL,
 		SLJIT_ARG_RETURN(marg->args[0]));
 }
 
 SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_icall_multiarg(struct sljit_compiler *compiler, struct sljit_marg *marg, sljit_s32 src, sljit_sw srcw)
 {
+#ifndef __SOFTFP__
 	FAIL_IF(mov_float_args(compiler));
+#endif
 	return sljit_emit_icall(compiler, SLJIT_CALL,
 		SLJIT_ARG_RETURN(marg->args[0]), src, srcw);
 }
