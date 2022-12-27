@@ -643,10 +643,6 @@ static sljit_s32 emit_op_imm(struct sljit_compiler *compiler, sljit_s32 flags, s
 		case SLJIT_MOV:
 			SLJIT_ASSERT(!(flags & SET_FLAGS) && (flags & ARG2_IMM) && arg1 == TMP_REG1);
 			return load_immediate(compiler, dst, imm);
-		case SLJIT_NOT:
-			SLJIT_ASSERT(flags & ARG2_IMM);
-			FAIL_IF(load_immediate(compiler, dst, (flags & INT_OP) ? (~imm & 0xffffffff) : ~imm));
-			goto set_flags;
 		case SLJIT_SUB:
 			compiler->status_flags_state = SLJIT_CURRENT_FLAGS_SUB;
 			if (flags & ARG1_IMM)
@@ -693,8 +689,13 @@ static sljit_s32 emit_op_imm(struct sljit_compiler *compiler, sljit_s32 flags, s
 				break;
 			CHECK_FLAGS(3 << 29);
 			return push_inst(compiler, (ANDI ^ inv_bits) | RD(dst) | RN(reg) | inst_bits);
-		case SLJIT_OR:
 		case SLJIT_XOR:
+			if (imm == -1) {
+				FAIL_IF(push_inst(compiler, (ORN ^ inv_bits) | RD(dst) | RN(TMP_ZERO) | RM(reg)));
+				goto set_flags;
+			}
+			/* fallthrough */
+		case SLJIT_OR:
 			inst_bits = logical_imm(imm, LOGICAL_IMM_CHECK | ((flags & INT_OP) ? 16 : 32));
 			if (!inst_bits)
 				break;
@@ -807,10 +808,6 @@ static sljit_s32 emit_op_imm(struct sljit_compiler *compiler, sljit_s32 flags, s
 	case SLJIT_MOV_S32:
 		SLJIT_ASSERT(!(flags & SET_FLAGS) && arg1 == TMP_REG1);
 		return push_inst(compiler, SBFM | (1 << 22) | RD(dst) | RN(arg2) | (31 << 10));
-	case SLJIT_NOT:
-		SLJIT_ASSERT(arg1 == TMP_REG1);
-		FAIL_IF(push_inst(compiler, (ORN ^ inv_bits) | RD(dst) | RN(TMP_ZERO) | RM(arg2)));
-		break; /* Set flags. */
 	case SLJIT_CLZ:
 		SLJIT_ASSERT(arg1 == TMP_REG1);
 		return push_inst(compiler, (CLZ ^ inv_bits) | RD(dst) | RN(arg2));
@@ -979,7 +976,7 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_enter(struct sljit_compiler *compi
 	set_emit_enter(compiler, options, arg_types, scratches, saveds, fscratches, fsaveds, local_size);
 
 	saved_regs_size = GET_SAVED_REGISTERS_SIZE(scratches, saveds - saved_arg_count, 2);
-	saved_regs_size += GET_SAVED_FLOAT_REGISTERS_SIZE(fscratches, fsaveds, SSIZE_OF(f64));
+	saved_regs_size += GET_SAVED_FLOAT_REGISTERS_SIZE(fscratches, fsaveds, f64);
 
 	local_size = (local_size + saved_regs_size + 0xf) & ~0xf;
 	compiler->ma_stack_offset = compiler->local_size = local_size;
@@ -1166,7 +1163,7 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_set_context(struct sljit_compiler *comp
 	set_set_context(compiler, options, arg_types, scratches, saveds, fscratches, fsaveds, local_size);
 
 	saved_regs_size = GET_SAVED_REGISTERS_SIZE(scratches, saveds - SLJIT_KEPT_SAVEDS_COUNT(options), 2);
-	saved_regs_size += GET_SAVED_FLOAT_REGISTERS_SIZE(fscratches, fsaveds, SSIZE_OF(f64));
+	saved_regs_size += GET_SAVED_FLOAT_REGISTERS_SIZE(fscratches, fsaveds, f64);
 
 	compiler->local_size = (local_size + saved_regs_size + 0xf) & ~0xf;
 	return SLJIT_SUCCESS;
@@ -1608,6 +1605,32 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_op_src(struct sljit_compiler *comp
 	return SLJIT_SUCCESS;
 }
 
+SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_op_dst(struct sljit_compiler *compiler, sljit_s32 op,
+	sljit_s32 dst, sljit_sw dstw)
+{
+	sljit_s32 dst_r = TMP_LR;
+
+	CHECK_ERROR();
+	CHECK(check_sljit_emit_op_dst(compiler, op, dst, dstw));
+	ADJUST_LOCAL_OFFSET(dst, dstw);
+
+	switch (op) {
+	case SLJIT_FAST_ENTER:
+		if (FAST_IS_REG(dst))
+			return push_inst(compiler, ORR | RD(dst) | RN(TMP_ZERO) | RM(TMP_LR));
+		break;
+	case SLJIT_GET_RETURN_ADDRESS:
+		dst_r = FAST_IS_REG(dst) ? dst : TMP_REG1;
+		FAIL_IF(emit_op_mem(compiler, WORD_SIZE, dst_r, SLJIT_MEM1(SLJIT_FRAMEP), 0x8, TMP_REG2));
+		break;
+	}
+
+	if (dst & SLJIT_MEM)
+		return emit_op_mem(compiler, WORD_SIZE | STORE, dst_r, dst, dstw, TMP_REG2);
+
+	return SLJIT_SUCCESS;
+}
+
 SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_get_register_index(sljit_s32 reg)
 {
 	CHECK_REG_INDEX(check_sljit_get_register_index(reg));
@@ -1845,19 +1868,6 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_fop2(struct sljit_compiler *compil
 /* --------------------------------------------------------------------- */
 /*  Other instructions                                                   */
 /* --------------------------------------------------------------------- */
-
-SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_fast_enter(struct sljit_compiler *compiler, sljit_s32 dst, sljit_sw dstw)
-{
-	CHECK_ERROR();
-	CHECK(check_sljit_emit_fast_enter(compiler, dst, dstw));
-	ADJUST_LOCAL_OFFSET(dst, dstw);
-
-	if (FAST_IS_REG(dst))
-		return push_inst(compiler, ORR | RD(dst) | RN(TMP_ZERO) | RM(TMP_LR));
-
-	/* Memory. */
-	return emit_op_mem(compiler, WORD_SIZE | STORE, TMP_LR, dst, dstw, TMP_REG1);
-}
 
 static sljit_sw gen_alloca(struct sljit_compiler *compiler, struct sljit_alloca *alloc)
 {

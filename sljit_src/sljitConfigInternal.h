@@ -143,16 +143,14 @@ extern "C" {
 #define SLJIT_CONFIG_X86_32 1
 #elif defined(__x86_64__)
 #define SLJIT_CONFIG_X86_64 1
-#elif defined(__arm__) || defined(__ARM__)
-#if 0 && defined __thumb2__
-#define SLJIT_CONFIG_ARM_THUMB2 1
-#elif defined(__ARM_ARCH_7__) || defined(__ARM_ARCH_7A__) || defined(__ARM_ARCH_7R__)
-#define SLJIT_CONFIG_ARM_V7 1
-#else
-#define SLJIT_CONFIG_ARM_V5 1
-#endif
-#elif defined (__aarch64__)
+#elif defined(__aarch64__)
 #define SLJIT_CONFIG_ARM_64 1
+#elif 0 && defined(__thumb2__)
+#define SLJIT_CONFIG_ARM_THUMB2 1
+#elif (defined(__ARM_ARCH) && __ARM_ARCH >= 7) || (defined(__ARM_ARCH_7__) || defined(__ARM_ARCH_7A__) || defined(__ARM_ARCH_7R__) || defined(__ARM_ARCH_7S__)) || (defined(__ARM_ARCH_8A__) || defined(__ARM_ARCH_8R__))
+#define SLJIT_CONFIG_ARM_V7 1
+#elif defined(__arm__) || defined (__ARM__)
+#define SLJIT_CONFIG_ARM_V5 1
 /*
 #elif defined(__ppc64__) || defined(__powerpc64__) || (defined(_ARCH_PPC64) && defined(__64BIT__)) || (defined(_POWER) && defined(__64BIT__))
 #define SLJIT_CONFIG_PPC_64 1

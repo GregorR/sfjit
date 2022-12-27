@@ -737,7 +737,7 @@ ALT_FORM5		0x010000 */
 #endif
 
 #if (defined SLJIT_PPC_STACK_FRAME_V2 && SLJIT_PPC_STACK_FRAME_V2)
-#define LR_SAVE_OFFSET		2 * SSIZE_OF(sw)
+#define LR_SAVE_OFFSET		(2 * SSIZE_OF(sw))
 #else
 #define LR_SAVE_OFFSET		SSIZE_OF(sw)
 #endif
@@ -763,7 +763,7 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_enter(struct sljit_compiler *compi
 	set_emit_enter(compiler, options, arg_types, scratches, saveds, fscratches, fsaveds, local_size);
 
 	local_size += GET_SAVED_REGISTERS_SIZE(scratches, saveds - saved_arg_count, 0)
-		+ GET_SAVED_FLOAT_REGISTERS_SIZE(fscratches, fsaveds, sizeof(sljit_f64));
+		+ GET_SAVED_FLOAT_REGISTERS_SIZE(fscratches, fsaveds, f64);
 
 	if (!(options & SLJIT_ENTER_REG_ARG))
 		local_size += SSIZE_OF(sw);
@@ -873,7 +873,7 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_set_context(struct sljit_compiler *comp
 	set_set_context(compiler, options, arg_types, scratches, saveds, fscratches, fsaveds, local_size);
 
 	local_size += GET_SAVED_REGISTERS_SIZE(scratches, saveds - SLJIT_KEPT_SAVEDS_COUNT(options), 0)
-		+ GET_SAVED_FLOAT_REGISTERS_SIZE(fscratches, fsaveds, sizeof(sljit_f64));
+		+ GET_SAVED_FLOAT_REGISTERS_SIZE(fscratches, fsaveds, f64);
 
 	if (!(options & SLJIT_ENTER_REG_ARG))
 		local_size += SSIZE_OF(sw);
@@ -1353,14 +1353,14 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_op1(struct sljit_compiler *compile
 	if (GET_FLAG_TYPE(op_flags) == SLJIT_OVERFLOW)
 		FAIL_IF(push_inst(compiler, MTXER | S(TMP_ZERO)));
 
-	if (op < SLJIT_NOT && FAST_IS_REG(src) && src == dst) {
+	if (op <= SLJIT_MOV_P && FAST_IS_REG(src) && src == dst) {
 		if (!TYPE_CAST_NEEDED(op))
 			return SLJIT_SUCCESS;
 	}
 
 #if (defined SLJIT_CONFIG_PPC_64 && SLJIT_CONFIG_PPC_64)
 	if (op_flags & SLJIT_32) {
-		if (op < SLJIT_NOT) {
+		if (op <= SLJIT_MOV_P) {
 			if (src & SLJIT_MEM) {
 				if (op == SLJIT_MOV_S32)
 					op = SLJIT_MOV_U32;
@@ -1409,9 +1409,6 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_op1(struct sljit_compiler *compile
 
 	case SLJIT_MOV_S16:
 		return EMIT_MOV(SLJIT_MOV_S16, HALF_DATA | SIGNED_DATA, (sljit_s16));
-
-	case SLJIT_NOT:
-		return emit_op(compiler, SLJIT_NOT, flags, dst, dstw, TMP_REG1, 0, src, srcw);
 
 	case SLJIT_CLZ:
 	case SLJIT_CTZ:
@@ -1657,9 +1654,16 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_op2(struct sljit_compiler *compile
 			FAIL_IF(push_inst(compiler, MTXER | S(TMP_ZERO)));
 		return emit_op(compiler, SLJIT_MUL, flags, dst, dstw, src1, src1w, src2, src2w);
 
+	case SLJIT_XOR:
+		if ((src2 & SLJIT_IMM) && src2w == -1) {
+			return emit_op(compiler, GET_OPCODE(op), flags | ALT_FORM4, dst, dstw, TMP_REG1, 0, src1, src1w);
+		}
+		if ((src1 & SLJIT_IMM) && src1w == -1) {
+			return emit_op(compiler, GET_OPCODE(op), flags | ALT_FORM4, dst, dstw, TMP_REG1, 0, src2, src2w);
+		}
+		/* fallthrough */
 	case SLJIT_AND:
 	case SLJIT_OR:
-	case SLJIT_XOR:
 		/* Commutative unsigned operations. */
 		if (!HAS_FLAGS(op) || GET_OPCODE(op) == SLJIT_AND) {
 			if (TEST_UL_IMM(src2, src2w)) {
@@ -1850,6 +1854,34 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_op_src(struct sljit_compiler *comp
 	case SLJIT_PREFETCH_ONCE:
 		return emit_prefetch(compiler, src, srcw);
 	}
+
+	return SLJIT_SUCCESS;
+}
+
+SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_op_dst(struct sljit_compiler *compiler, sljit_s32 op,
+	sljit_s32 dst, sljit_sw dstw)
+{
+	sljit_s32 dst_r;
+
+	CHECK_ERROR();
+	CHECK(check_sljit_emit_op_dst(compiler, op, dst, dstw));
+	ADJUST_LOCAL_OFFSET(dst, dstw);
+
+	switch (op) {
+	case SLJIT_FAST_ENTER:
+		if (FAST_IS_REG(dst))
+			return push_inst(compiler, MFLR | D(dst));
+
+		FAIL_IF(push_inst(compiler, MFLR | D(TMP_REG1)));
+		break;
+	case SLJIT_GET_RETURN_ADDRESS:
+		dst_r = FAST_IS_REG(dst) ? dst : TMP_REG1;
+		FAIL_IF(emit_op_mem(compiler, WORD_DATA | LOAD_DATA, dst_r, SLJIT_MEM1(SLJIT_SP), compiler->local_size + LR_SAVE_OFFSET, TMP_REG2));
+		break;
+	}
+
+	if (dst & SLJIT_MEM)
+		return emit_op_mem(compiler, WORD_DATA, TMP_REG1, dst, dstw, TMP_REG2);
 
 	return SLJIT_SUCCESS;
 }
@@ -2164,24 +2196,6 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_fop2(struct sljit_compiler *compil
 }
 
 #undef SELECT_FOP
-
-/* --------------------------------------------------------------------- */
-/*  Other instructions                                                   */
-/* --------------------------------------------------------------------- */
-
-SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_fast_enter(struct sljit_compiler *compiler, sljit_s32 dst, sljit_sw dstw)
-{
-	CHECK_ERROR();
-	CHECK(check_sljit_emit_fast_enter(compiler, dst, dstw));
-	ADJUST_LOCAL_OFFSET(dst, dstw);
-
-	if (FAST_IS_REG(dst))
-		return push_inst(compiler, MFLR | D(dst));
-
-	/* Memory. */
-	FAIL_IF(push_inst(compiler, MFLR | D(TMP_REG2)));
-	return emit_op(compiler, SLJIT_MOV, WORD_DATA, dst, dstw, TMP_REG1, 0, TMP_REG2, 0);
-}
 
 /* --------------------------------------------------------------------- */
 /*  Conditional instructions                                             */
@@ -2813,7 +2827,7 @@ SLJIT_API_FUNC_ATTRIBUTE struct sljit_const* sljit_emit_const(struct sljit_compi
 	PTR_FAIL_IF(emit_const(compiler, dst_r, init_value));
 
 	if (dst & SLJIT_MEM)
-		PTR_FAIL_IF(emit_op(compiler, SLJIT_MOV, WORD_DATA, dst, dstw, TMP_REG1, 0, TMP_REG2, 0));
+		PTR_FAIL_IF(emit_op_mem(compiler, WORD_DATA, dst_r, dst, dstw, TMP_REG1));
 
 	return const_;
 }

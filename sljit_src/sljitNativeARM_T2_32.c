@@ -621,12 +621,6 @@ static sljit_s32 emit_op_imm(struct sljit_compiler *compiler, sljit_s32 flags, s
 		case SLJIT_MOV:
 			SLJIT_ASSERT(!(flags & SET_FLAGS) && (flags & ARG2_IMM) && arg1 == TMP_REG2);
 			return load_immediate(compiler, dst, imm);
-		case SLJIT_NOT:
-			if (!(flags & SET_FLAGS))
-				return load_immediate(compiler, dst, ~imm);
-			/* Since the flags should be set, we just fallback to the register mode.
-			   Although some clever things could be done here, "NOT IMM" does not worth the efforts. */
-			break;
 		case SLJIT_ADD:
 			compiler->status_flags_state = SLJIT_CURRENT_FLAGS_ADD;
 			imm2 = NEGATE(imm);
@@ -733,6 +727,11 @@ static sljit_s32 emit_op_imm(struct sljit_compiler *compiler, sljit_s32 flags, s
 				return push_inst32(compiler, ORNI | (flags & SET_FLAGS) | RD4(dst) | RN4(reg) | imm);
 			break;
 		case SLJIT_XOR:
+			if (imm == (sljit_uw)-1) {
+				if (IS_2_LO_REGS(dst, reg))
+					return push_inst16(compiler, MVNS | RD3(dst) | RN3(reg));
+				return push_inst32(compiler, MVN_W | (flags & SET_FLAGS) | RD4(dst) | RM4(reg));
+			}
 			imm = get_imm(imm);
 			if (imm != INVALID_IMM)
 				return push_inst32(compiler, EORI | (flags & SET_FLAGS) | RD4(dst) | RN4(reg) | imm);
@@ -829,11 +828,6 @@ static sljit_s32 emit_op_imm(struct sljit_compiler *compiler, sljit_s32 flags, s
 		if (IS_2_LO_REGS(dst, arg2))
 			return push_inst16(compiler, SXTH | RD3(dst) | RN3(arg2));
 		return push_inst32(compiler, SXTH_W | RD4(dst) | RM4(arg2));
-	case SLJIT_NOT:
-		SLJIT_ASSERT(arg1 == TMP_REG2);
-		if (IS_2_LO_REGS(dst, arg2))
-			return push_inst16(compiler, MVNS | RD3(dst) | RN3(arg2));
-		return push_inst32(compiler, MVN_W | (flags & SET_FLAGS) | RD4(dst) | RM4(arg2));
 	case SLJIT_CLZ:
 		SLJIT_ASSERT(arg1 == TMP_REG2);
 		return push_inst32(compiler, CLZ | RN4(arg2) | RD4(dst) | RM4(arg2));
@@ -1356,6 +1350,7 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_set_context(struct sljit_compiler *comp
 
 	size = GET_SAVED_REGISTERS_SIZE(scratches, saveds - SLJIT_KEPT_SAVEDS_COUNT(options), 1);
 
+	/* Doubles are saved, so alignment is unaffected. */
 	if ((size & SSIZE_OF(sw)) != 0 && (fsaveds > 0 || fscratches >= SLJIT_FIRST_SAVED_FLOAT_REG))
 		size += SSIZE_OF(sw);
 
@@ -1909,6 +1904,46 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_op_src(struct sljit_compiler *comp
 	return SLJIT_SUCCESS;
 }
 
+SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_op_dst(struct sljit_compiler *compiler, sljit_s32 op,
+	sljit_s32 dst, sljit_sw dstw)
+{
+	sljit_s32 size, dst_r;
+
+	CHECK_ERROR();
+	CHECK(check_sljit_emit_op_dst(compiler, op, dst, dstw));
+	ADJUST_LOCAL_OFFSET(dst, dstw);
+
+	switch (op) {
+	case SLJIT_FAST_ENTER:
+		SLJIT_ASSERT(reg_map[TMP_REG2] == 14);
+
+		if (FAST_IS_REG(dst))
+			return push_inst16(compiler, MOV | SET_REGS44(dst, TMP_REG2));
+		break;
+	case SLJIT_GET_RETURN_ADDRESS:
+		size = GET_SAVED_REGISTERS_SIZE(compiler->scratches, compiler->saveds - SLJIT_KEPT_SAVEDS_COUNT(compiler->options), 0);
+
+		if (compiler->fsaveds > 0 || compiler->fscratches >= SLJIT_FIRST_SAVED_FLOAT_REG) {
+			/* The size of pc is not added above. */
+			if ((size & SSIZE_OF(sw)) == 0)
+				size += SSIZE_OF(sw);
+
+			size += GET_SAVED_FLOAT_REGISTERS_SIZE(compiler->fscratches, compiler->fsaveds, f64);
+		}
+
+		SLJIT_ASSERT(((compiler->local_size + size + SSIZE_OF(sw)) & 0x7) == 0);
+
+		dst_r = FAST_IS_REG(dst) ? dst : TMP_REG2;
+		FAIL_IF(emit_op_mem(compiler, WORD_SIZE, dst_r, SLJIT_MEM1(SLJIT_SP), compiler->local_size + size, TMP_REG1));
+		break;
+	}
+
+	if (dst & SLJIT_MEM)
+		return emit_op_mem(compiler, WORD_SIZE | STORE, TMP_REG2, dst, dstw, TMP_REG1);
+
+	return SLJIT_SUCCESS;
+}
+
 SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_get_register_index(sljit_s32 reg)
 {
 	CHECK_REG_INDEX(check_sljit_get_register_index(reg));
@@ -2141,25 +2176,6 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_fop2(struct sljit_compiler *compil
 	if (!(dst & SLJIT_MEM))
 		return SLJIT_SUCCESS;
 	return emit_fop_mem(compiler, (op & SLJIT_32), TMP_FREG1, dst, dstw);
-}
-
-/* --------------------------------------------------------------------- */
-/*  Other instructions                                                   */
-/* --------------------------------------------------------------------- */
-
-SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_fast_enter(struct sljit_compiler *compiler, sljit_s32 dst, sljit_sw dstw)
-{
-	CHECK_ERROR();
-	CHECK(check_sljit_emit_fast_enter(compiler, dst, dstw));
-	ADJUST_LOCAL_OFFSET(dst, dstw);
-
-	SLJIT_ASSERT(reg_map[TMP_REG2] == 14);
-
-	if (FAST_IS_REG(dst))
-		return push_inst16(compiler, MOV | SET_REGS44(dst, TMP_REG2));
-
-	/* Memory. */
-	return emit_op_mem(compiler, WORD_SIZE | STORE, TMP_REG2, dst, dstw, TMP_REG1);
 }
 
 /* --------------------------------------------------------------------- */

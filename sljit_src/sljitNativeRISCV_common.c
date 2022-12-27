@@ -531,6 +531,13 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_has_cpu_feature(sljit_s32 feature_type)
 {
 	switch (feature_type) {
 	case SLJIT_HAS_FPU:
+#ifdef SLJIT_IS_FPU_AVAILABLE
+		return SLJIT_IS_FPU_AVAILABLE;
+#elif defined(__riscv_float_abi_soft)
+		return 0;
+#else
+		return 1;
+#endif
 	case SLJIT_HAS_ZERO_REGISTER:
 		return 1;
 	default:
@@ -610,10 +617,10 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_enter(struct sljit_compiler *compi
 	if (fsaveds > 0 || fscratches >= SLJIT_FIRST_SAVED_FLOAT_REG) {
 		if ((local_size & SSIZE_OF(sw)) != 0)
 			local_size += SSIZE_OF(sw);
-		local_size += GET_SAVED_FLOAT_REGISTERS_SIZE(fscratches, fsaveds, sizeof(sljit_f64));
+		local_size += GET_SAVED_FLOAT_REGISTERS_SIZE(fscratches, fsaveds, f64);
 	}
 #else
-	local_size += GET_SAVED_FLOAT_REGISTERS_SIZE(fscratches, fsaveds, sizeof(sljit_f64));
+	local_size += GET_SAVED_FLOAT_REGISTERS_SIZE(fscratches, fsaveds, f64);
 #endif
 	local_size = (local_size + SLJIT_LOCALS_OFFSET + 15) & ~0xf;
 	compiler->local_size = local_size;
@@ -704,10 +711,10 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_set_context(struct sljit_compiler *comp
 	if (fsaveds > 0 || fscratches >= SLJIT_FIRST_SAVED_FLOAT_REG) {
 		if ((local_size & SSIZE_OF(sw)) != 0)
 			local_size += SSIZE_OF(sw);
-		local_size += GET_SAVED_FLOAT_REGISTERS_SIZE(fscratches, fsaveds, sizeof(sljit_f64));
+		local_size += GET_SAVED_FLOAT_REGISTERS_SIZE(fscratches, fsaveds, f64);
 	}
 #else
-	local_size += GET_SAVED_FLOAT_REGISTERS_SIZE(fscratches, fsaveds, sizeof(sljit_f64));
+	local_size += GET_SAVED_FLOAT_REGISTERS_SIZE(fscratches, fsaveds, f64);
 #endif
 	compiler->local_size = (local_size + SLJIT_LOCALS_OFFSET + 15) & ~0xf;
 
@@ -1738,9 +1745,6 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_op1(struct sljit_compiler *compile
 	case SLJIT_MOV_S16:
 		return emit_op(compiler, op, HALF_DATA | SIGNED_DATA | MOVE_OP, dst, dstw, TMP_REG1, 0, src, (src & SLJIT_IMM) ? (sljit_s16)srcw : srcw);
 
-	case SLJIT_NOT:
-		return emit_op(compiler, SLJIT_XOR | (op & (SLJIT_32 | SLJIT_SET_Z)), flags, dst, dstw, src, srcw, SLJIT_IMM, -1);
-
 	case SLJIT_CLZ:
 	case SLJIT_CTZ:
 		return emit_op(compiler, op, flags, dst, dstw, TMP_REG1, 0, src, srcw);
@@ -1943,6 +1947,34 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_op_src(struct sljit_compiler *comp
 	case SLJIT_PREFETCH_ONCE:
 		return SLJIT_SUCCESS;
 	}
+
+	return SLJIT_SUCCESS;
+}
+
+SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_op_dst(struct sljit_compiler *compiler, sljit_s32 op,
+	sljit_s32 dst, sljit_sw dstw)
+{
+	sljit_s32 dst_r;
+
+	CHECK_ERROR();
+	CHECK(check_sljit_emit_op_dst(compiler, op, dst, dstw));
+	ADJUST_LOCAL_OFFSET(dst, dstw);
+
+	switch (op) {
+	case SLJIT_FAST_ENTER:
+		if (FAST_IS_REG(dst))
+			return push_inst(compiler, ADDI | RD(dst) | RS1(RETURN_ADDR_REG) | IMM_I(0));
+
+		SLJIT_ASSERT(RETURN_ADDR_REG == TMP_REG2);
+		break;
+	case SLJIT_GET_RETURN_ADDRESS:
+		dst_r = FAST_IS_REG(dst) ? dst : TMP_REG2;
+		FAIL_IF(emit_op_mem(compiler, WORD_DATA | LOAD_DATA, dst_r, SLJIT_MEM1(SLJIT_SP), compiler->local_size - SSIZE_OF(sw)));
+		break;
+	}
+
+	if (dst & SLJIT_MEM)
+		return emit_op_mem(compiler, WORD_DATA, TMP_REG2, dst, dstw);
 
 	return SLJIT_SUCCESS;
 }
@@ -2243,23 +2275,6 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_fop2(struct sljit_compiler *compil
 
 #undef FLOAT_DATA
 #undef FMT
-
-/* --------------------------------------------------------------------- */
-/*  Other instructions                                                   */
-/* --------------------------------------------------------------------- */
-
-SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_fast_enter(struct sljit_compiler *compiler, sljit_s32 dst, sljit_sw dstw)
-{
-	CHECK_ERROR();
-	CHECK(check_sljit_emit_fast_enter(compiler, dst, dstw));
-	ADJUST_LOCAL_OFFSET(dst, dstw);
-
-	if (FAST_IS_REG(dst))
-		return push_inst(compiler, ADDI | RD(dst) | RS1(RETURN_ADDR_REG) | IMM_I(0));
-
-	/* Memory. */
-	return emit_op_mem(compiler, WORD_DATA, RETURN_ADDR_REG, dst, dstw);
-}
 
 /* --------------------------------------------------------------------- */
 /*  Conditional instructions                                             */
