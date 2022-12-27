@@ -7,11 +7,20 @@ backwards compatibility, it is still named sljit. There are a few major changes:
 
 (2) SLJIT_STACKP is introduced, and is the actual stack pointer. New space can
     be allocated by sljit_emit_alloca and optionally deallocated with
-    sljit_emit_pop.
+    sljit_emit_pop. Deallocation is optional. Space allocated with
+    sljit_emit_alloca can be modified post hoc using sljit_set_alloca, so you
+    can generate code without being certain of how much space is needed, then
+    adapt on the fly.
 
-Space allocated with sljit_emit_alloca can be modified post hoc using
-sljit_set_alloca, so you can generate code without being certain of how much
-space is needed, then adapt on the fly.
+(3) A system is introduced for functions with more than four arguments. See
+    testa2 in sljitTest.c for details. Multi-argument functions *must* use
+    sljit_enter_multiarg and *must* start by getting all their arguments with
+    sljit_emit_get_marg. To call a multi-argument function, use sljit_marg_arg
+    to construct a struct sljit_marg, sljit_marg_properties to determine where
+    everything has to go, sljit_emit_alloca to get stack space, standard MOVs to
+    move things into registers, and sljit_emit_marg_mov for arguments, then use
+    sljit_emit_marg_call or sljit_emit_marg_icall. All multi-argument functions
+    use standard C calling convention.
 
 ---
 
