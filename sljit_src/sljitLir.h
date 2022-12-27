@@ -423,6 +423,10 @@ struct sljit_alloca {
 struct sljit_marg {
 	struct sljit_marg *next[SLJIT_ARG_TYPE_COUNT];
 	sljit_u32 ct;
+#if (defined SLJIT_CONFIG_ARM_32 && SLJIT_CONFIG_ARM_32)
+	sljit_s32 *bases;
+	sljit_sw *offs;
+#endif
 	sljit_u8 args[1];
 };
 
@@ -477,6 +481,11 @@ struct sljit_compiler {
 	/* Offset of the next stack-bound argument relative to the
 	 * frame pointer */
 	sljit_sw ma_stack_offset;
+
+#if (defined SLJIT_CONFIG_ARM_32 && SLJIT_CONFIG_ARM_32)
+	/* Offset where the float args are stored on the stack */
+	sljit_sw ma_float_offset;
+#endif
 
 #if (defined SLJIT_HAS_STATUS_FLAGS_STATE && SLJIT_HAS_STATUS_FLAGS_STATE)
 	sljit_s32 status_flags_state;

@@ -2658,6 +2658,7 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_get_local_base(struct sljit_compiler *c
 
 #endif
 
+#if !(defined SLJIT_CONFIG_ARM_32 && SLJIT_CONFIG_ARM_32)
 SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_enter_multiarg(struct sljit_compiler *compiler,
 	sljit_s32 options, sljit_s32 return_type, sljit_s32 scratches, sljit_s32 saveds,
 	sljit_s32 fscratches, sljit_s32 fsaveds, sljit_s32 local_size)
@@ -2800,6 +2801,7 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_get_marg(struct sljit_compiler *co
 	compiler->ma_stack_offset += size;
 	return SLJIT_SUCCESS;
 }
+#endif /* ARM32 */
 
 SLJIT_API_FUNC_ATTRIBUTE struct sljit_marg *sljit_marg_arg(struct sljit_compiler *compiler, struct sljit_marg *prev, sljit_s32 type)
 {
@@ -2828,6 +2830,7 @@ SLJIT_API_FUNC_ATTRIBUTE struct sljit_marg *sljit_marg_arg(struct sljit_compiler
 	return ret;
 }
 
+#if !(defined SLJIT_CONFIG_ARM_32 && SLJIT_CONFIG_ARM_32)
 SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_marg_properties(struct sljit_compiler *compiler, struct sljit_marg *marg, sljit_s32 *word_regs, sljit_s32 *float_regs, sljit_s32 *stack_space)
 {
 	sljit_s32 w = 0, f = 0, s = 0;
@@ -2960,6 +2963,7 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_icall_multiarg(struct sljit_compil
 		SLJIT_ARG_RETURN(marg->args[0]), src, srcw);
 }
 #endif
+#endif /* ARM32 */
 
 #else /* SLJIT_CONFIG_UNSUPPORTED */
 

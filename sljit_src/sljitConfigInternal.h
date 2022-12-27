@@ -680,7 +680,10 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_sw sljit_exec_offset(void* ptr);
 
 #define SLJIT_NUMBER_OF_REGISTERS 11
 #define SLJIT_NUMBER_OF_SAVED_REGISTERS 7
+#define SLJIT_NUMBER_OF_ARG_REGISTERS 4
 #define SLJIT_NUMBER_OF_FLOAT_REGISTERS 14
+/* There are float arg registers, but they have to be handled specially */
+#define SLJIT_NUMBER_OF_FLOAT_ARG_REGISTERS 0
 #define SLJIT_NUMBER_OF_SAVED_FLOAT_REGISTERS 8
 #define SLJIT_LOCALS_OFFSET_BASE 0
 
