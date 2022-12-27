@@ -567,9 +567,11 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_enter(struct sljit_compiler *compi
 
 static sljit_s32 fill_marg_locs(struct sljit_compiler *compiler)
 {
-	compiler->ma_word_locs = ensure_abuf(compiler, SLJIT_NUMBER_OF_ARG_REGISTERS);
+	compiler->ma_word_locs = (sljit_u8 *)
+		ensure_abuf(compiler, SLJIT_NUMBER_OF_ARG_REGISTERS);
 	FAIL_IF_NULL(compiler->ma_word_locs);
-	compiler->ma_float_locs = ensure_abuf(compiler, SLJIT_NUMBER_OF_FLOAT_ARG_REGISTERS);
+	compiler->ma_float_locs = (sljit_u8 *)
+		ensure_abuf(compiler, SLJIT_NUMBER_OF_FLOAT_ARG_REGISTERS);
 	FAIL_IF_NULL(compiler->ma_float_locs);
 	memcpy(compiler->ma_word_locs, arg_regs, SLJIT_NUMBER_OF_ARG_REGISTERS);
 	memcpy(compiler->ma_float_locs, farg_regs, SLJIT_NUMBER_OF_FLOAT_ARG_REGISTERS);
@@ -1053,7 +1055,7 @@ static sljit_s32 call_with_margs(struct sljit_compiler *compiler, struct sljit_m
 				continue;
 			}
 
-			mc = memchr(srcs + idx, dst,
+			mc = (sljit_u8 *) memchr(srcs + idx, dst,
 				SLJIT_NUMBER_OF_ARG_REGISTERS - (size_t) idx);
 
 			if (!mc && csrc != dst) {
@@ -1096,7 +1098,7 @@ static sljit_s32 call_with_margs(struct sljit_compiler *compiler, struct sljit_m
 				continue;
 			}
 
-			mc = memchr(fsrcs + idx, dst,
+			mc = (sljit_u8 *) memchr(fsrcs + idx, dst,
 				SLJIT_NUMBER_OF_FLOAT_ARG_REGISTERS -
 				(size_t) idx);
 

@@ -1269,10 +1269,10 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_get_marg(struct sljit_compiler *co
 
 	if (!compiler->ma_word_locs) {
 		sljit_u8 u;
-		compiler->ma_word_locs =
+		compiler->ma_word_locs = (sljit_u8 *)
 			ensure_abuf(compiler, SLJIT_NUMBER_OF_ARG_REGISTERS);
 		FAIL_IF_NULL(compiler->ma_word_locs);
-		compiler->ma_float_locs =
+		compiler->ma_float_locs = (sljit_u8 *)
 			ensure_abuf(compiler, FLOAT_ARG_REGS * 2);
 		FAIL_IF_NULL(compiler->ma_float_locs);
 		for (u = 0; u < SLJIT_NUMBER_OF_ARG_REGISTERS; u++)
@@ -1303,7 +1303,7 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_get_marg(struct sljit_compiler *co
 				return SLJIT_SUCCESS;
 
 			/* Check for conflicts */
-			mc = memchr(compiler->ma_word_locs + idx,
+			mc = (sljit_u8 *) memchr(compiler->ma_word_locs + idx,
 				sugg, SLJIT_NUMBER_OF_ARG_REGISTERS - (size_t) idx);
 			if (!mc) {
 				/* No conflicts, just move it into place */
@@ -2772,7 +2772,7 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_fop2(struct sljit_compiler *compil
 
 static sljit_sw gen_alloca(struct sljit_compiler *compiler, struct sljit_alloca *alloc)
 {
-	alloc->addr = ensure_buf(compiler, 6 * sizeof(sljit_uw));
+	alloc->addr = (sljit_u8 *) ensure_buf(compiler, 6 * sizeof(sljit_uw));
 	compiler->buf->used_size -= 6 * sizeof(sljit_uw);
 	compiler->shift_imm = 12;
 	FAIL_IF(push_inst(compiler, MOV | RD(TMP_REG1)));
@@ -2832,9 +2832,9 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_marg_properties(struct sljit_compiler *
 	sljit_s32 w = 0, f = 0, s = 0;
 	sljit_u32 u;
 	sljit_u8 fused[FLOAT_ARG_REGS * 2] = {0};
-	marg->bases = ensure_abuf(compiler, (marg->ct - 1) * SSIZE_OF(s32));
+	marg->bases = (sljit_s32 *) ensure_abuf(compiler, (marg->ct - 1) * SSIZE_OF(s32));
 	FAIL_IF_NULL(marg->bases);
-	marg->offs = ensure_abuf(compiler, (marg->ct - 1) * SSIZE_OF(sw));
+	marg->offs = (sljit_sw *) ensure_abuf(compiler, (marg->ct - 1) * SSIZE_OF(sw));
 	FAIL_IF_NULL(marg->offs);
 
 	(void) compiler;
@@ -2936,6 +2936,9 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_marg_mov(
 		case SLJIT_ARG_TYPE_F32:
 			op = SLJIT_MOV_F32;
 			break;
+
+		default:
+			abort();
 	}
 	if (type < SLJIT_ARG_TYPE_F64) {
 		sljit_emit_op1(compiler, op, dst, dstw, src, srcw);

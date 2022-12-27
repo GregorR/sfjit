@@ -1141,9 +1141,11 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_enter(struct sljit_compiler *compi
 static sljit_s32 fill_marg_locs(struct sljit_compiler *compiler)
 {
 	sljit_s32 i;
-	compiler->ma_word_locs = ensure_abuf(compiler, SLJIT_NUMBER_OF_ARG_REGISTERS);
+	compiler->ma_word_locs = (sljit_u8 *)
+		ensure_abuf(compiler, SLJIT_NUMBER_OF_ARG_REGISTERS);
 	FAIL_IF_NULL(compiler->ma_word_locs);
-	compiler->ma_float_locs = ensure_abuf(compiler, SLJIT_NUMBER_OF_FLOAT_ARG_REGISTERS);
+	compiler->ma_float_locs = (sljit_u8 *)
+		ensure_abuf(compiler, SLJIT_NUMBER_OF_FLOAT_ARG_REGISTERS);
 	FAIL_IF_NULL(compiler->ma_float_locs);
 	for (i = 0; i < SLJIT_NUMBER_OF_ARG_REGISTERS; i++)
 		compiler->ma_word_locs[i] = (sljit_u8) i + 1;
@@ -1871,7 +1873,7 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_fop2(struct sljit_compiler *compil
 
 static sljit_sw gen_alloca(struct sljit_compiler *compiler, struct sljit_alloca *alloc)
 {
-	alloc->addr = ensure_buf(compiler, 5 * sizeof(sljit_ins));
+	alloc->addr = (sljit_u8 *) ensure_buf(compiler, 5 * sizeof(sljit_ins));
 	compiler->buf->used_size -= 5 * sizeof(sljit_ins);
 	load_immediate(compiler, TMP_REG1, 0x12345678);
 	push_inst(compiler, ADDI | RD(TMP_REG2) | RN(SLJIT_STACKP));

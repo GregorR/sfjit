@@ -2705,7 +2705,7 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_get_marg(struct sljit_compiler *co
 				return SLJIT_SUCCESS;
 
 			/* Check for conflicts */
-			mc = memchr(compiler->ma_word_locs + idx,
+			mc = (sljit_u8 *) memchr(compiler->ma_word_locs + idx,
 				sugg, SLJIT_NUMBER_OF_ARG_REGISTERS - (size_t) idx);
 			if (!mc) {
 				/* No conflicts, just move it into place */
@@ -2753,7 +2753,7 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_get_marg(struct sljit_compiler *co
 				return SLJIT_SUCCESS;
 
 			/* Check for conflicts */
-			mc = memchr(compiler->ma_float_locs + idx,
+			mc = (sljit_u8 *) memchr(compiler->ma_float_locs + idx,
 				sugg, SLJIT_NUMBER_OF_FLOAT_ARG_REGISTERS - (size_t) idx);
 			if (!mc) {
 				SLJIT_SKIP_CHECKS(compiler);
@@ -2807,7 +2807,7 @@ SLJIT_API_FUNC_ATTRIBUTE struct sljit_marg *sljit_marg_arg(struct sljit_compiler
 
 	if (!prev) {
 		if (!compiler->margs) {
-			compiler->margs =
+			compiler->margs = (struct sljit_marg *)
 				ensure_abuf(compiler, sizeof(struct sljit_marg));
 			PTR_FAIL_IF_NULL(compiler->margs);
 			memset(compiler->margs, 0, sizeof(struct sljit_marg));
@@ -2818,7 +2818,7 @@ SLJIT_API_FUNC_ATTRIBUTE struct sljit_marg *sljit_marg_arg(struct sljit_compiler
 	if (prev->next[type])
 		return prev->next[type];
 
-	ret = prev->next[type] =
+	ret = prev->next[type] = (struct sljit_marg *)
 		ensure_abuf(compiler, sizeof(struct sljit_marg) + prev->ct);
 	PTR_FAIL_IF_NULL(ret);
 	memset(ret, 0, sizeof(struct sljit_marg));
