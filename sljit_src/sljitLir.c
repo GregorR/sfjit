@@ -2689,8 +2689,21 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_get_marg(struct sljit_compiler *co
 		case SLJIT_ARG_TYPE_P:
 		{
 			sljit_s32 idx = compiler->ma_words;
-			sljit_s32 reg;
+			sljit_s32 reg, op;
 			sljit_u8 *mc;
+
+			switch (type) {
+				case SLJIT_ARG_TYPE_32:
+					op = SLJIT_MOV_S32;
+					break;
+
+				case SLJIT_ARG_TYPE_P:
+					op = SLJIT_MOV_P;
+					break;
+
+				default:
+					op = SLJIT_MOV;
+			}
 
 			if (compiler->ma_words++ >= SLJIT_NUMBER_OF_ARG_REGISTERS)
 				break;
@@ -2701,8 +2714,14 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_get_marg(struct sljit_compiler *co
 			reg = compiler->ma_word_locs[idx];
 
 			/* And move it into place */
-			if (reg == sugg)
+			if (reg == sugg) {
+				if (op != SLJIT_MOV) {
+					FAIL_IF(sljit_emit_op1(
+						compiler, op,
+						sugg, 0, sugg, 0));
+				}
 				return SLJIT_SUCCESS;
+			}
 
 			/* Check for conflicts */
 			mc = (sljit_u8 *) memchr(compiler->ma_word_locs + idx,
@@ -2711,7 +2730,7 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_get_marg(struct sljit_compiler *co
 				/* No conflicts, just move it into place */
 				SLJIT_SKIP_CHECKS(compiler);
 				FAIL_IF(sljit_emit_op1(
-					compiler, SLJIT_MOV,
+					compiler, op,
 					sugg, 0, reg, 0));
 				return SLJIT_SUCCESS;
 			}
@@ -2730,6 +2749,11 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_get_marg(struct sljit_compiler *co
 			FAIL_IF(sljit_emit_op2(
 				compiler, SLJIT_XOR,
 				sugg, 0, sugg, 0, reg, 0));
+			if (op != SLJIT_MOV) {
+				FAIL_IF(sljit_emit_op1(
+					compiler, op,
+					sugg, 0, sugg, 0));
+			}
 			return SLJIT_SUCCESS;
 		}
 

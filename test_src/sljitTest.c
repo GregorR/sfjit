@@ -10928,8 +10928,9 @@ static void testa2(void)
 		sljit_emit_op2(compiler, SLJIT_SUB, SLJIT_R0, 0, SLJIT_R0, 0,
 			locs[i+1], offs[i+1]);
 	}
+	sljit_emit_op1(compiler, SLJIT_MOV_S32, SLJIT_R1, 0, locs[9], offs[9]);
 	sljit_emit_op2(compiler, SLJIT_MUL, SLJIT_R0, 0, SLJIT_R0, 0,
-		locs[9], offs[9]);
+		SLJIT_R1, 0);
 
 	sljit_emit_return(compiler, SLJIT_MOV, SLJIT_R0, 0);
 
