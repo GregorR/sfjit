@@ -979,7 +979,8 @@ static sljit_s32 sljit_emit_get_return_address(struct sljit_compiler *compiler,
 static sljit_sw gen_alloca(struct sljit_compiler *compiler, struct sljit_alloca *alloc)
 {
 	sljit_u8 *inst;
-	BINARY_IMM32(SUB, 0x12345678, SLJIT_STACKP, 0);
+	compiler->mode32 = 0;
+	BINARY_IMM32(SUB, 0x2345678, SLJIT_STACKP, 0);
 	alloc->addr = inst;
 	return SLJIT_SUCCESS;
 }
@@ -1021,6 +1022,7 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_pop(struct sljit_compiler *compile
 	size = (size + 0xfUL) & ~0xfUL;
 	if (size > 0xffffffff)
 		abort();
+	compiler->mode32 = 0;
 	BINARY_IMM32(ADD, (sljit_u32) size, SLJIT_STACKP, 0);
 	return SLJIT_SUCCESS;
 }
