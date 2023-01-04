@@ -2763,7 +2763,7 @@ static SLJIT_INLINE sljit_s32 sljit_emit_fop1_conv_sw_from_f64(struct sljit_comp
 	sljit_s32 dst_r;
 	sljit_u8 *inst;
 
-	CHECK_EXTRA_REGS(dst, dstw, (void) 0);
+	CHECK_EXTRA_REGS(dst, dstw, (void)0);
 	dst_r = FAST_IS_REG(dst) ? dst : TMP_REG1;
 
 #if (defined SLJIT_CONFIG_X86_64 && SLJIT_CONFIG_X86_64)
@@ -2788,7 +2788,7 @@ static SLJIT_INLINE sljit_s32 sljit_emit_fop1_conv_f64_from_sw(struct sljit_comp
 	sljit_s32 dst_r = FAST_IS_REG(dst) ? dst : TMP_FREG;
 	sljit_u8 *inst;
 
-	CHECK_EXTRA_REGS(src, srcw, (void) 0);
+	CHECK_EXTRA_REGS(src, srcw, (void)0);
 
 #if (defined SLJIT_CONFIG_X86_64 && SLJIT_CONFIG_X86_64)
 	if (GET_OPCODE(op) == SLJIT_CONV_F64_FROM_SW)
