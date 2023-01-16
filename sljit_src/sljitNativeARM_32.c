@@ -2832,10 +2832,12 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_marg_properties(struct sljit_compiler *
 	sljit_s32 w = 0, f = 0, s = 0;
 	sljit_u32 u;
 	sljit_u8 fused[FLOAT_ARG_REGS * 2] = {0};
-	marg->bases = (sljit_s32 *) ensure_abuf(compiler, (marg->ct - 1) * SSIZE_OF(s32));
-	FAIL_IF_NULL(marg->bases);
-	marg->offs = (sljit_sw *) ensure_abuf(compiler, (marg->ct - 1) * SSIZE_OF(sw));
-	FAIL_IF_NULL(marg->offs);
+	if (!marg->bases) {
+		marg->bases = (sljit_s32 *) ensure_abuf(compiler, (marg->ct - 1) * SSIZE_OF(s32));
+		FAIL_IF_NULL(marg->bases);
+		marg->offs = (sljit_sw *) ensure_abuf(compiler, (marg->ct - 1) * SSIZE_OF(sw));
+		FAIL_IF_NULL(marg->offs);
+	}
 
 	(void) compiler;
 

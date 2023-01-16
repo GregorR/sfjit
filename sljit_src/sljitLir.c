@@ -2692,6 +2692,7 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_enter_multiarg(struct sljit_compil
 	return SLJIT_SUCCESS;
 }
 
+#if !(defined SLJIT_CONFIG_X86_64 && SLJIT_CONFIG_X86_64 && defined _WIN64)
 static sljit_s32 fill_marg_locs(struct sljit_compiler *compiler);
 
 SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_get_marg(struct sljit_compiler *compiler,
@@ -2833,7 +2834,7 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_get_marg(struct sljit_compiler *co
 	}
 
 	/* It's in the stack */
-#if (defined SLJIT_64BIT_ARCHITECTURE)
+#if (defined SLJIT_64BIT_ARCHITECTURE && SLJIT_64BIT_ARCHITECTURE)
 	size = SSIZE_OF(sw);
 #else
 	if (type == SLJIT_ARG_TYPE_F64)
@@ -2846,6 +2847,8 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_get_marg(struct sljit_compiler *co
 	compiler->ma_stack_offset += size;
 	return SLJIT_SUCCESS;
 }
+#endif /* X86_64 && _WIN64 */
+
 #endif /* ARM32 */
 
 SLJIT_API_FUNC_ATTRIBUTE struct sljit_marg *sljit_marg_arg(struct sljit_compiler *compiler, struct sljit_marg *prev, sljit_s32 type)
@@ -2875,7 +2878,8 @@ SLJIT_API_FUNC_ATTRIBUTE struct sljit_marg *sljit_marg_arg(struct sljit_compiler
 	return ret;
 }
 
-#if !(defined SLJIT_CONFIG_ARM_32 && SLJIT_CONFIG_ARM_32)
+#if !(defined SLJIT_CONFIG_ARM_32 && SLJIT_CONFIG_ARM_32) && \
+    !(defined SLJIT_CONFIG_X86_64 && SLJIT_CONFIG_X86_64 && defined _WIN64)
 SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_marg_properties(struct sljit_compiler *compiler, struct sljit_marg *marg, sljit_s32 *word_regs, sljit_s32 *float_regs, sljit_s32 *stack_space)
 {
 	sljit_s32 w = 0, f = 0, s = 0;
@@ -3010,8 +3014,8 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_icall_multiarg(struct sljit_compil
 	return sljit_emit_icall(compiler, SLJIT_CALL,
 		SLJIT_ARG_RETURN(marg->args[0]), src, srcw);
 }
-#endif
-#endif /* ARM32 */
+#endif /* !X86_64 */
+#endif /* !ARM32 && !_WIN64 */
 
 #else /* SLJIT_CONFIG_UNSUPPORTED */
 

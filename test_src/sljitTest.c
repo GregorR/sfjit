@@ -11099,40 +11099,6 @@ static void testa2(void)
 	CHECK(compiler);
 	sljit_free_compiler(compiler);
 
-	FAILED(
-		code1.testa2_f1(
-			851842,
-			-202516,
-			-926541,
-			946114,
-			-605596,
-			757116,
-			383969,
-			-887514,
-			-549260,
-			-136
-		) != -430095920,
-		"testa2 case 1 failed\n"
-	);
-
-#if (defined SLJIT_64BIT_ARCHITECTURE && SLJIT_64BIT_ARCHITECTURE)
-	FAILED(
-		code1.testa2_f1(
-			85184216,
-			-20251648,
-			-92654160,
-			94611487,
-			-60559668,
-			75711612,
-			38396976,
-			-88751410,
-			-54926045,
-			-1367
-		) != -432309859518L,
-		"testa2 case 2 failed\n"
-	);
-#endif
-
 	code2.testa2_f2(
 		85184216,
 		1481955.125,
@@ -11156,26 +11122,60 @@ static void testa2(void)
 		-9981201
 	);
 
-	FAILED(res[0] != 85184216, "testa2 case 3 failed\n");
-	FAILED(res[1] != 1481955.125, "testa2 case 4 failed\n");
-	FAILED(res[2] != -20251648, "testa2 case 5 failed\n");
-	FAILED(res[3] != -6034305.5, "testa2 case 6 failed\n");
-	FAILED(res[4] != -92654160, "testa2 case 7 failed\n");
-	FAILED(res[5] != 2971148.25, "testa2 case 8 failed\n");
-	FAILED(res[6] != 94611487, "testa2 case 9 failed\n");
-	FAILED(res[7] != -8367898.5, "testa2 case 10 failed\n");
-	FAILED(res[8] != -60559668, "testa2 case 11 failed\n");
-	FAILED(res[9] != -1791444.125, "testa2 case 12 failed\n");
-	FAILED(res[10] != 75711612, "testa2 case 13 failed\n");
-	FAILED(res[11] != -7172975.375, "testa2 case 14 failed\n");
-	FAILED(res[12] != 38396976, "testa2 case 15 failed\n");
-	FAILED(res[13] != -661649.875, "testa2 case 16 failed\n");
-	FAILED(res[14] != -88751410, "testa2 case 17 failed\n");
-	FAILED(res[15] != 8365837.875, "testa2 case 18 failed\n");
-	FAILED(res[16] != -54926045, "testa2 case 19 failed\n");
-	FAILED(res[17] != 1607258.625, "testa2 case 20 failed\n");
-	FAILED(res[18] != -1367, "testa2 case 21 failed\n");
-	FAILED(res[19] != -9981201, "testa2 case 22 failed\n");
+	FAILED(res[0] != 85184216, "testa2 case 1 failed\n");
+	FAILED(res[1] != 1481955.125, "testa2 case 2 failed\n");
+	FAILED(res[2] != -20251648, "testa2 case 3 failed\n");
+	FAILED(res[3] != -6034305.5, "testa2 case 4 failed\n");
+	FAILED(res[4] != -92654160, "testa2 case 5 failed\n");
+	FAILED(res[5] != 2971148.25, "testa2 case 6 failed\n");
+	FAILED(res[6] != 94611487, "testa2 case 7 failed\n");
+	FAILED(res[7] != -8367898.5, "testa2 case 8 failed\n");
+	FAILED(res[8] != -60559668, "testa2 case 9 failed\n");
+	FAILED(res[9] != -1791444.125, "testa2 case 10 failed\n");
+	FAILED(res[10] != 75711612, "testa2 case 11 failed\n");
+	FAILED(res[11] != -7172975.375, "testa2 case 12 failed\n");
+	FAILED(res[12] != 38396976, "testa2 case 13 failed\n");
+	FAILED(res[13] != -661649.875, "testa2 case 14 failed\n");
+	FAILED(res[14] != -88751410, "testa2 case 15 failed\n");
+	FAILED(res[15] != 8365837.875, "testa2 case 16 failed\n");
+	FAILED(res[16] != -54926045, "testa2 case 17 failed\n");
+	FAILED(res[17] != 1607258.625, "testa2 case 18 failed\n");
+	FAILED(res[18] != -1367, "testa2 case 19 failed\n");
+	FAILED(res[19] != -9981201, "testa2 case 20 failed\n");
+
+	FAILED(
+		code1.testa2_f1(
+			851842,
+			-202516,
+			-926541,
+			946114,
+			-605596,
+			757116,
+			383969,
+			-887514,
+			-549260,
+			-136
+		) != -430095920,
+		"testa2 case 21 failed\n"
+	);
+
+#if (defined SLJIT_64BIT_ARCHITECTURE && SLJIT_64BIT_ARCHITECTURE)
+	FAILED(
+		code1.testa2_f1(
+			85184216,
+			-20251648,
+			-92654160,
+			94611487,
+			-60559668,
+			75711612,
+			38396976,
+			-88751410,
+			-54926045,
+			-1367
+		) != -432309859518L,
+		"testa2 case 22 failed\n"
+	);
+#endif
 
 	code3.func0();
 

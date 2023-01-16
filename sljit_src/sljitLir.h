@@ -423,7 +423,8 @@ struct sljit_alloca {
 struct sljit_marg {
 	struct sljit_marg *next[SLJIT_ARG_TYPE_COUNT];
 	sljit_u32 ct;
-#if (defined SLJIT_CONFIG_ARM_32 && SLJIT_CONFIG_ARM_32)
+#if (defined SLJIT_CONFIG_ARM_32 && SLJIT_CONFIG_ARM_32) || \
+    (defined SLJIT_CONFIG_X86_64 && SLJIT_CONFIG_X86_64 && defined _WIN64)
 	sljit_s32 *bases;
 	sljit_sw *offs;
 #endif

@@ -99,7 +99,6 @@ static const sljit_u8 reg_lmap[SLJIT_NUMBER_OF_REGISTERS + 5] = {
 };
 /* Argument registers */
 static const sljit_u8 arg_regs[SLJIT_NUMBER_OF_ARG_REGISTERS] = {
-	// 7, 6, 2, 1, 8, 9
 	3, 2, TMP_REG1, 4, 5, TMP_REG2
 };
 #else
@@ -125,9 +124,15 @@ static const sljit_u8 freg_lmap[SLJIT_NUMBER_OF_FLOAT_REGISTERS + 2] = {
 	4, 0, 1, 2, 3, 5, 6, 7, 0, 1, 2,  3,  4,  5,  6,  7, 4
 };
 
+#ifndef _WIN64
 static const sljit_u8 farg_regs[SLJIT_NUMBER_OF_FLOAT_ARG_REGISTERS] = {
 	1, 2, 3, 4, SLJIT_NUMBER_OF_FLOAT_REGISTERS + 1, 5, 6, 7
 };
+#else /* _WIN64 */
+static const sljit_u8 farg_regs[SLJIT_NUMBER_OF_FLOAT_ARG_REGISTERS] = {
+	1, 2, 3, 4
+};
+#endif
 
 #define REX_W		0x48
 #define REX_R		0x44
