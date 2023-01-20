@@ -10910,9 +10910,9 @@ static void test87(void)
 	/* ibuf[3] */
 	sljit_emit_op1(compiler, SLJIT_MOV32, SLJIT_MEM1(SLJIT_S1), 3 * sizeof(sljit_s32), SLJIT_R4, 0);
 
-	sljit_emit_op1(compiler, SLJIT_MOV32, SLJIT_MEM1(SLJIT_SP), 0, SLJIT_IMM, (sljit_s32)0xfeeddccb);
+	sljit_emit_op1(compiler, SLJIT_MOV32, SLJIT_MEM1(SLJIT_FRAMEP), 0, SLJIT_IMM, (sljit_s32)0xfeeddccb);
 	/* ibuf[4] */
-	sljit_emit_op1(compiler, SLJIT_REV32, SLJIT_MEM1(SLJIT_S1), 4 * sizeof(sljit_s32), SLJIT_MEM1(SLJIT_SP), 0);
+	sljit_emit_op1(compiler, SLJIT_REV32, SLJIT_MEM1(SLJIT_S1), 4 * sizeof(sljit_s32), SLJIT_MEM1(SLJIT_FRAMEP), 0);
 
 	sljit_emit_return_void(compiler);
 
