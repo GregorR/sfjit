@@ -1473,28 +1473,33 @@ static SLJIT_INLINE CHECK_RETURN_TYPE check_sljit_emit_op2(struct sljit_compiler
 }
 
 static SLJIT_INLINE CHECK_RETURN_TYPE check_sljit_emit_shift_into(struct sljit_compiler *compiler, sljit_s32 op,
-	sljit_s32 src_dst,
-	sljit_s32 src1, sljit_sw src1w,
-	sljit_s32 src2, sljit_sw src2w)
+	sljit_s32 dst_reg,
+	sljit_s32 src1_reg,
+	sljit_s32 src2_reg,
+	sljit_s32 src3, sljit_sw src3w)
 {
 #if (defined SLJIT_ARGUMENT_CHECKS && SLJIT_ARGUMENT_CHECKS)
 	CHECK_ARGUMENT(GET_OPCODE(op) == SLJIT_SHL || GET_OPCODE(op) == SLJIT_LSHR
 		|| GET_OPCODE(op) == SLJIT_MSHL || GET_OPCODE(op) == SLJIT_MLSHR);
 	CHECK_ARGUMENT((op & ~(0xff | SLJIT_32 | SLJIT_SHIFT_INTO_NON_ZERO)) == 0);
-	CHECK_ARGUMENT(FUNCTION_CHECK_IS_REG(src_dst));
-	FUNCTION_CHECK_SRC(src1, src1w);
-	FUNCTION_CHECK_SRC(src2, src2w);
+	CHECK_ARGUMENT(FUNCTION_CHECK_IS_REG(dst_reg));
+	CHECK_ARGUMENT(FUNCTION_CHECK_IS_REG(src1_reg));
+	CHECK_ARGUMENT(FUNCTION_CHECK_IS_REG(src2_reg));
+	FUNCTION_CHECK_SRC(src3, src3w);
+	CHECK_ARGUMENT(dst_reg != src2_reg);
 #endif
 #if (defined SLJIT_VERBOSE && SLJIT_VERBOSE)
 	if (SLJIT_UNLIKELY(!!compiler->verbose)) {
 		fprintf(compiler->verbose, "  %s%s.into%s ", op2_names[GET_OPCODE(op) - SLJIT_OP2_BASE], !(op & SLJIT_32) ? "" : "32",
 			(op & SLJIT_SHIFT_INTO_NON_ZERO) ? ".nz" : "");
 
-		sljit_verbose_reg(compiler, src_dst);
+		sljit_verbose_reg(compiler, dst_reg);
 		fprintf(compiler->verbose, ", ");
-		sljit_verbose_param(compiler, src1, src1w);
+		sljit_verbose_reg(compiler, src1_reg);
 		fprintf(compiler->verbose, ", ");
-		sljit_verbose_param(compiler, src2, src2w);
+		sljit_verbose_reg(compiler, src2_reg);
+		fprintf(compiler->verbose, ", ");
+		sljit_verbose_param(compiler, src3, src3w);
 		fprintf(compiler->verbose, "\n");
 	}
 #endif
@@ -1753,6 +1758,59 @@ static SLJIT_INLINE CHECK_RETURN_TYPE check_sljit_emit_fop2(struct sljit_compile
 		fprintf(compiler->verbose, ", ");
 		sljit_verbose_fparam(compiler, src2, src2w);
 		fprintf(compiler->verbose, "\n");
+	}
+#endif
+	CHECK_RETURN_OK;
+}
+
+static SLJIT_INLINE CHECK_RETURN_TYPE check_sljit_emit_fcopy(struct sljit_compiler *compiler, sljit_s32 op,
+	sljit_s32 freg, sljit_s32 reg)
+{
+#if (defined SLJIT_ARGUMENT_CHECKS && SLJIT_ARGUMENT_CHECKS)
+	CHECK_ARGUMENT(sljit_has_cpu_feature(SLJIT_HAS_FPU));
+	CHECK_ARGUMENT(GET_OPCODE(op) >= SLJIT_COPY_TO_F64 && GET_OPCODE(op) <= SLJIT_COPY_FROM_F64);
+	CHECK_ARGUMENT(!(op & (SLJIT_SET_Z | VARIABLE_FLAG_MASK)));
+	CHECK_ARGUMENT(FUNCTION_CHECK_IS_FREG(freg));
+
+#if (defined SLJIT_64BIT_ARCHITECTURE && SLJIT_64BIT_ARCHITECTURE)
+	CHECK_ARGUMENT(FUNCTION_CHECK_IS_REG(reg));
+#else /* !SLJIT_64BIT_ARCHITECTURE */
+	switch (op) {
+	case SLJIT_COPY32_TO_F32:
+	case SLJIT_COPY32_FROM_F32:
+		CHECK_ARGUMENT(FUNCTION_CHECK_IS_REG(reg));
+		break;
+	case SLJIT_COPY_TO_F64:
+	case SLJIT_COPY_FROM_F64:
+		if (reg & REG_PAIR_MASK) {
+			CHECK_ARGUMENT(FUNCTION_CHECK_IS_REG(REG_PAIR_FIRST(reg)));
+			CHECK_ARGUMENT(FUNCTION_CHECK_IS_REG(REG_PAIR_SECOND(reg)));
+			break;
+		}
+
+		CHECK_ARGUMENT(FUNCTION_CHECK_IS_REG(reg));
+		break;
+	}
+#endif /* SLJIT_64BIT_ARCHITECTURE */
+#endif
+#if (defined SLJIT_VERBOSE && SLJIT_VERBOSE)
+	if (SLJIT_UNLIKELY(!!compiler->verbose)) {
+		fprintf(compiler->verbose, "  copy%s_%s_f%s ", (op & SLJIT_32) ? "32" : "",
+			GET_OPCODE(op) == SLJIT_COPY_TO_F64 ? "to" : "from", (op & SLJIT_32) ? "32" : "64");
+
+		sljit_verbose_freg(compiler, freg);
+
+		if (reg & REG_PAIR_MASK) {
+			fprintf(compiler->verbose, ", {");
+			sljit_verbose_reg(compiler, REG_PAIR_FIRST(reg));
+			fprintf(compiler->verbose, ", ");
+			sljit_verbose_reg(compiler, REG_PAIR_SECOND(reg));
+			fprintf(compiler->verbose, "}\n");
+		} else {
+			fprintf(compiler->verbose, ", ");
+			sljit_verbose_reg(compiler, reg);
+			fprintf(compiler->verbose, "\n");
+		}
 	}
 #endif
 	CHECK_RETURN_OK;
@@ -3209,17 +3267,18 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_op2u(struct sljit_compiler *compil
 }
 
 SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_shift_into(struct sljit_compiler *compiler, sljit_s32 op,
-	sljit_s32 src_dst,
-	sljit_s32 src1, sljit_sw src1w,
-	sljit_s32 src2, sljit_sw src2w)
+	sljit_s32 dst_reg,
+	sljit_s32 src1_reg,
+	sljit_s32 src2_reg,
+	sljit_s32 src3, sljit_sw src3w)
 {
 	SLJIT_UNUSED_ARG(compiler);
 	SLJIT_UNUSED_ARG(op);
-	SLJIT_UNUSED_ARG(src_dst);
-	SLJIT_UNUSED_ARG(src1);
-	SLJIT_UNUSED_ARG(src1w);
-	SLJIT_UNUSED_ARG(src2);
-	SLJIT_UNUSED_ARG(src2w);
+	SLJIT_UNUSED_ARG(dst_reg);
+	SLJIT_UNUSED_ARG(src1_reg);
+	SLJIT_UNUSED_ARG(src2_reg);
+	SLJIT_UNUSED_ARG(src3);
+	SLJIT_UNUSED_ARG(src3w);
 	SLJIT_UNREACHABLE();
 	return SLJIT_ERR_UNSUPPORTED;
 }
@@ -3284,6 +3343,17 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_fop2(struct sljit_compiler *compil
 	SLJIT_UNUSED_ARG(src1w);
 	SLJIT_UNUSED_ARG(src2);
 	SLJIT_UNUSED_ARG(src2w);
+	SLJIT_UNREACHABLE();
+	return SLJIT_ERR_UNSUPPORTED;
+}
+
+SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_fcopy(struct sljit_compiler *compiler, sljit_s32 op,
+	sljit_s32 freg, sljit_s32 reg)
+{
+	SLJIT_UNUSED_ARG(compiler);
+	SLJIT_UNUSED_ARG(op);
+	SLJIT_UNUSED_ARG(freg);
+	SLJIT_UNUSED_ARG(reg);
 	SLJIT_UNREACHABLE();
 	return SLJIT_ERR_UNSUPPORTED;
 }
