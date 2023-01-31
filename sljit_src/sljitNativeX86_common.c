@@ -2631,12 +2631,12 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_shift_into(struct sljit_compiler *
 			src1w = 0;
 		} else if ((src1_reg & SLJIT_MEM) || src1_reg == SLJIT_PREF_SHIFT_REG) {
 			restore_sp4 = (src3 == SLJIT_R0) ? SLJIT_R1 : SLJIT_R0;
-			EMIT_MOV(compiler, SLJIT_MEM1(SLJIT_SP), sizeof(sljit_s32), restore_sp4, 0);
+			EMIT_MOV(compiler, SLJIT_MEM1(SLJIT_FRAMEP), sizeof(sljit_s32), restore_sp4, 0);
 			EMIT_MOV(compiler, restore_sp4, 0, src1_reg, src1w);
 			src1_reg = restore_sp4;
 			src1w = 0;
 		} else {
-			EMIT_MOV(compiler, SLJIT_MEM1(SLJIT_SP), sizeof(sljit_s32), src1_reg, 0);
+			EMIT_MOV(compiler, SLJIT_MEM1(SLJIT_FRAMEP), sizeof(sljit_s32), src1_reg, 0);
 			restore_sp4 = src1_reg;
 		}
 #endif /* SLJIT_CONFIG_X86_64 */
@@ -2674,12 +2674,12 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_shift_into(struct sljit_compiler *
 				src1w = 0;
 			} else if ((src1_reg & SLJIT_MEM) || src1_reg == SLJIT_PREF_SHIFT_REG) {
 				restore_sp4 = (src3 == SLJIT_R0) ? SLJIT_R1 : SLJIT_R0;
-				EMIT_MOV(compiler, SLJIT_MEM1(SLJIT_SP), sizeof(sljit_s32), restore_sp4, 0);
+				EMIT_MOV(compiler, SLJIT_MEM1(SLJIT_FRAMEP), sizeof(sljit_s32), restore_sp4, 0);
 				EMIT_MOV(compiler, restore_sp4, 0, src1_reg, src1w);
 				src1_reg = restore_sp4;
 				src1w = 0;
 			} else {
-				EMIT_MOV(compiler, SLJIT_MEM1(SLJIT_SP), sizeof(sljit_s32), src1_reg, 0);
+				EMIT_MOV(compiler, SLJIT_MEM1(SLJIT_FRAMEP), sizeof(sljit_s32), src1_reg, 0);
 				restore_sp4 = src1_reg;
 			}
 		} else if (dst_reg != src1_reg) {
@@ -2704,7 +2704,7 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_shift_into(struct sljit_compiler *
 					EMIT_MOV(compiler, TMP_REG1, 0, SLJIT_PREF_SHIFT_REG, 0);
 					restore_ecx = 1;
 				} else {
-					EMIT_MOV(compiler, SLJIT_MEM1(SLJIT_SP), 0, SLJIT_PREF_SHIFT_REG, 0);
+					EMIT_MOV(compiler, SLJIT_MEM1(SLJIT_FRAMEP), 0, SLJIT_PREF_SHIFT_REG, 0);
 					restore_ecx = 2;
 				}
 #endif /* SLJIT_CONFIG_X86_64 */
@@ -2746,13 +2746,13 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_shift_into(struct sljit_compiler *
 	}
 #else /* !SLJIT_CONFIG_X86_64 */
 	if (restore_ecx)
-		EMIT_MOV(compiler, SLJIT_PREF_SHIFT_REG, 0, restore_ecx == 1 ? TMP_REG1 : SLJIT_MEM1(SLJIT_SP), 0);
+		EMIT_MOV(compiler, SLJIT_PREF_SHIFT_REG, 0, restore_ecx == 1 ? TMP_REG1 : SLJIT_MEM1(SLJIT_FRAMEP), 0);
 
 	if (src1_reg != dst_reg)
 		EMIT_MOV(compiler, dst_reg, dstw, src1_reg, 0);
 
 	if (restore_sp4)
-		return emit_mov(compiler, restore_sp4, 0, SLJIT_MEM1(SLJIT_SP), sizeof(sljit_s32));
+		return emit_mov(compiler, restore_sp4, 0, SLJIT_MEM1(SLJIT_FRAMEP), sizeof(sljit_s32));
 #endif /* SLJIT_CONFIG_X86_32 */
 
 	return SLJIT_SUCCESS;

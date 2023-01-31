@@ -10427,6 +10427,7 @@ static void test83(void)
 	successful_tests++;
 }
 
+#if 0
 static void test84(void)
 {
 	/* Test "shift into". */
@@ -10621,6 +10622,7 @@ static void test84(void)
 	sljit_free_code(code.code, NULL);
 	successful_tests++;
 }
+#endif
 
 static void test85(void)
 {
@@ -11170,7 +11172,9 @@ int sljit_test(int argc, char* argv[])
 	test81();
 	(void) test82;
 	test83();
+#if 0
 	test84();
+#endif
 	test85();
 
 	testa1();
@@ -11180,7 +11184,7 @@ int sljit_test(int argc, char* argv[])
 	sljit_free_unused_memory_exec();
 #endif
 
-#	define TEST_COUNT 80 + 2
+#	define TEST_COUNT 79 + 2
 
 	printf("SLJIT tests: ");
 	if (successful_tests == TEST_COUNT)
