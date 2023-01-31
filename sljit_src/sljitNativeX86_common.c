@@ -2441,8 +2441,10 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_op2(struct sljit_compiler *compile
 {
 	CHECK_ERROR();
 
+#if (defined SLJIT_DEBUG && SLJIT_DEBUG)
 	if (!SLJIT_UNLIKELY(compiler->skip_checks))
 		CHECK_ARGUMENT(dst != TMP_REG1 || HAS_FLAGS(op));
+#endif
 
 	CHECK(check_sljit_emit_op2(compiler, op, 0, dst, dstw, src1, src1w, src2, src2w));
 	ADJUST_LOCAL_OFFSET(dst, dstw);
@@ -3363,7 +3365,7 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_get_local_base(struct sljit_compiler *c
 		SLJIT_ASSERT(emit_lea_binary(compiler, dst, dstw, SLJIT_FRAMEP, 0, TMP_REG1, 0) != SLJIT_ERR_UNSUPPORTED);
 		return compiler->error;
 #else
-		return emit_lea_binary(compiler, dst, dstw, SLJIT_SP, 0, TMP_REG1, 0);
+		return emit_lea_binary(compiler, dst, dstw, SLJIT_FRAMEP, 0, TMP_REG1, 0);
 #endif
 	}
 #endif
