@@ -689,15 +689,13 @@ static SLJIT_INLINE sljit_uw sljit_get_generated_code_size(struct sljit_compiler
 SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_has_cpu_feature(sljit_s32 feature_type);
 
 /* If type is between SLJIT_ORDERED_EQUAL and SLJIT_ORDERED_LESS_EQUAL,
-   sljit_cmp_info returns one, if the cpu supports the passed floating
-   point comparison type.
+   sljit_cmp_info returns with:
+     zero - if the cpu supports the floating point comparison type
+     one - if the comparison requires two machine instructions
+     two - if the comparison requires more than two machine instructions
 
-   If type is SLJIT_UNORDERED or SLJIT_ORDERED, sljit_cmp_info returns
-   one, if the cpu supports checking the unordered comparison result
-   regardless of the comparison type passed to the comparison instruction.
-   The returned value is always one, if there is at least one type between
-   SLJIT_ORDERED_EQUAL and SLJIT_ORDERED_LESS_EQUAL where sljit_cmp_info
-   returns with a zero value.
+   When the result is non-zero, it is recommended to avoid
+   using the specified comparison type if it is easy to do so.
 
    Otherwise it returns zero. */
 SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_cmp_info(sljit_s32 type);
@@ -906,6 +904,15 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_pop(struct sljit_compiler *compile
 #define SLJIT_MEM2(r1, r2)	(SLJIT_MEM | (r1) | ((r2) << 8))
 #define SLJIT_IMM		0x40
 #define SLJIT_REG_PAIR(r1, r2)	((r1) | ((r2) << 8))
+
+/* Macros for checking operand types (only for valid arguments). */
+#define SLJIT_IS_REG(arg)	((arg) > 0 && (arg) < SLJIT_IMM)
+#define SLJIT_IS_MEM(arg)	((arg) & SLJIT_MEM)
+#define SLJIT_IS_MEM0(arg)	((arg) == SLJIT_MEM)
+#define SLJIT_IS_MEM1(arg)	((arg) > SLJIT_MEM && (arg) < (SLJIT_MEM + SLJIT_IMM))
+#define SLJIT_IS_MEM2(arg)	(((arg) & SLJIT_MEM) && (arg) >= (SLJIT_MEM << 1))
+#define SLJIT_IS_IMM(arg)	((arg) == SLJIT_IMM)
+#define SLJIT_IS_REG_PAIR(arg)	(((arg) >> 8) != 0)
 
 /* Sets 32 bit operation mode on 64 bit CPUs. This option is ignored on
    32 bit CPUs. When this option is set for an arithmetic operation, only
@@ -1123,6 +1130,28 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_op0(struct sljit_compiler *compile
    Note: immediate source argument is not supported */
 #define SLJIT_REV			(SLJIT_OP1_BASE + 11)
 #define SLJIT_REV32			(SLJIT_REV | SLJIT_32)
+/* Reverse the order of bytes in the lower 16 bit and extend as unsigned
+   Flags: - (may destroy flags)
+   Note: converts between little and big endian formats
+   Note: immediate source argument is not supported */
+#define SLJIT_REV_U16			(SLJIT_OP1_BASE + 12)
+#define SLJIT_REV32_U16			(SLJIT_REV_U16 | SLJIT_32)
+/* Reverse the order of bytes in the lower 16 bit and extend as signed
+   Flags: - (may destroy flags)
+   Note: converts between little and big endian formats
+   Note: immediate source argument is not supported */
+#define SLJIT_REV_S16			(SLJIT_OP1_BASE + 13)
+#define SLJIT_REV32_S16			(SLJIT_REV_S16 | SLJIT_32)
+/* Reverse the order of bytes in the lower 32 bit and extend as unsigned
+   Flags: - (may destroy flags)
+   Note: converts between little and big endian formats
+   Note: immediate source argument is not supported */
+#define SLJIT_REV_U32			(SLJIT_OP1_BASE + 14)
+/* Reverse the order of bytes in the lower 32 bit and extend as signed
+   Flags: - (may destroy flags)
+   Note: converts between little and big endian formats
+   Note: immediate source argument is not supported */
+#define SLJIT_REV_S32			(SLJIT_OP1_BASE + 15)
 
 /* The following unary operations are supported by using sljit_emit_op2:
      - binary not: SLJIT_XOR with immedate -1 as src1 or src2
@@ -1412,7 +1441,7 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_fop2(struct sljit_compiler *compil
 
 /* Special data copy which involves floating point registers.
 
-  type must be between SLJIT_COPY_TO_F64 and SLJIT_COPY32_FROM_F32
+  op must be between SLJIT_COPY_TO_F64 and SLJIT_COPY32_FROM_F32
   freg must be a floating point register
   reg must be a register or register pair */
 
@@ -1456,19 +1485,19 @@ SLJIT_API_FUNC_ATTRIBUTE struct sljit_label* sljit_emit_label(struct sljit_compi
 #define SLJIT_LESS			2
 #define SLJIT_SET_LESS			SLJIT_SET(SLJIT_LESS)
 #define SLJIT_GREATER_EQUAL		3
-#define SLJIT_SET_GREATER_EQUAL		SLJIT_SET(SLJIT_GREATER_EQUAL)
+#define SLJIT_SET_GREATER_EQUAL		SLJIT_SET(SLJIT_LESS)
 #define SLJIT_GREATER			4
 #define SLJIT_SET_GREATER		SLJIT_SET(SLJIT_GREATER)
 #define SLJIT_LESS_EQUAL		5
-#define SLJIT_SET_LESS_EQUAL		SLJIT_SET(SLJIT_LESS_EQUAL)
+#define SLJIT_SET_LESS_EQUAL		SLJIT_SET(SLJIT_GREATER)
 #define SLJIT_SIG_LESS			6
 #define SLJIT_SET_SIG_LESS		SLJIT_SET(SLJIT_SIG_LESS)
 #define SLJIT_SIG_GREATER_EQUAL		7
-#define SLJIT_SET_SIG_GREATER_EQUAL	SLJIT_SET(SLJIT_SIG_GREATER_EQUAL)
+#define SLJIT_SET_SIG_GREATER_EQUAL	SLJIT_SET(SLJIT_SIG_LESS)
 #define SLJIT_SIG_GREATER		8
 #define SLJIT_SET_SIG_GREATER		SLJIT_SET(SLJIT_SIG_GREATER)
 #define SLJIT_SIG_LESS_EQUAL		9
-#define SLJIT_SET_SIG_LESS_EQUAL	SLJIT_SET(SLJIT_SIG_LESS_EQUAL)
+#define SLJIT_SET_SIG_LESS_EQUAL	SLJIT_SET(SLJIT_SIG_GREATER)
 
 #define SLJIT_OVERFLOW			10
 #define SLJIT_SET_OVERFLOW		SLJIT_SET(SLJIT_OVERFLOW)
@@ -1486,22 +1515,22 @@ SLJIT_API_FUNC_ATTRIBUTE struct sljit_label* sljit_emit_label(struct sljit_compi
 #define SLJIT_F_EQUAL				14
 #define SLJIT_SET_F_EQUAL			SLJIT_SET(SLJIT_F_EQUAL)
 #define SLJIT_F_NOT_EQUAL			15
-#define SLJIT_SET_F_NOT_EQUAL			SLJIT_SET(SLJIT_F_NOT_EQUAL)
+#define SLJIT_SET_F_NOT_EQUAL			SLJIT_SET(SLJIT_F_EQUAL)
 #define SLJIT_F_LESS				16
 #define SLJIT_SET_F_LESS			SLJIT_SET(SLJIT_F_LESS)
 #define SLJIT_F_GREATER_EQUAL			17
-#define SLJIT_SET_F_GREATER_EQUAL		SLJIT_SET(SLJIT_F_GREATER_EQUAL)
+#define SLJIT_SET_F_GREATER_EQUAL		SLJIT_SET(SLJIT_F_LESS)
 #define SLJIT_F_GREATER				18
 #define SLJIT_SET_F_GREATER			SLJIT_SET(SLJIT_F_GREATER)
 #define SLJIT_F_LESS_EQUAL			19
-#define SLJIT_SET_F_LESS_EQUAL			SLJIT_SET(SLJIT_F_LESS_EQUAL)
+#define SLJIT_SET_F_LESS_EQUAL			SLJIT_SET(SLJIT_F_GREATER)
 
 /* Jumps when either argument contains a NaN value. */
 #define SLJIT_UNORDERED				20
 #define SLJIT_SET_UNORDERED			SLJIT_SET(SLJIT_UNORDERED)
 /* Jumps when neither argument contains a NaN value. */
 #define SLJIT_ORDERED				21
-#define SLJIT_SET_ORDERED			SLJIT_SET(SLJIT_ORDERED)
+#define SLJIT_SET_ORDERED			SLJIT_SET(SLJIT_UNORDERED)
 
 /* Ordered / unordered floating point comparison types.
 
@@ -1511,28 +1540,28 @@ SLJIT_API_FUNC_ATTRIBUTE struct sljit_label* sljit_emit_label(struct sljit_compi
 #define SLJIT_ORDERED_EQUAL			22
 #define SLJIT_SET_ORDERED_EQUAL			SLJIT_SET(SLJIT_ORDERED_EQUAL)
 #define SLJIT_UNORDERED_OR_NOT_EQUAL		23
-#define SLJIT_SET_UNORDERED_OR_NOT_EQUAL	SLJIT_SET(SLJIT_UNORDERED_OR_NOT_EQUAL)
+#define SLJIT_SET_UNORDERED_OR_NOT_EQUAL	SLJIT_SET(SLJIT_ORDERED_EQUAL)
 #define SLJIT_ORDERED_LESS			24
 #define SLJIT_SET_ORDERED_LESS			SLJIT_SET(SLJIT_ORDERED_LESS)
 #define SLJIT_UNORDERED_OR_GREATER_EQUAL	25
-#define SLJIT_SET_UNORDERED_OR_GREATER_EQUAL	SLJIT_SET(SLJIT_UNORDERED_OR_GREATER_EQUAL)
+#define SLJIT_SET_UNORDERED_OR_GREATER_EQUAL	SLJIT_SET(SLJIT_ORDERED_LESS)
 #define SLJIT_ORDERED_GREATER			26
 #define SLJIT_SET_ORDERED_GREATER		SLJIT_SET(SLJIT_ORDERED_GREATER)
 #define SLJIT_UNORDERED_OR_LESS_EQUAL		27
-#define SLJIT_SET_UNORDERED_OR_LESS_EQUAL	SLJIT_SET(SLJIT_UNORDERED_OR_LESS_EQUAL)
+#define SLJIT_SET_UNORDERED_OR_LESS_EQUAL	SLJIT_SET(SLJIT_ORDERED_GREATER)
 
 #define SLJIT_UNORDERED_OR_EQUAL		28
 #define SLJIT_SET_UNORDERED_OR_EQUAL		SLJIT_SET(SLJIT_UNORDERED_OR_EQUAL)
 #define SLJIT_ORDERED_NOT_EQUAL			29
-#define SLJIT_SET_ORDERED_NOT_EQUAL		SLJIT_SET(SLJIT_ORDERED_NOT_EQUAL)
+#define SLJIT_SET_ORDERED_NOT_EQUAL		SLJIT_SET(SLJIT_UNORDERED_OR_EQUAL)
 #define SLJIT_UNORDERED_OR_LESS			30
 #define SLJIT_SET_UNORDERED_OR_LESS		SLJIT_SET(SLJIT_UNORDERED_OR_LESS)
 #define SLJIT_ORDERED_GREATER_EQUAL		31
-#define SLJIT_SET_ORDERED_GREATER_EQUAL		SLJIT_SET(SLJIT_ORDERED_GREATER_EQUAL)
+#define SLJIT_SET_ORDERED_GREATER_EQUAL		SLJIT_SET(SLJIT_UNORDERED_OR_LESS)
 #define SLJIT_UNORDERED_OR_GREATER		32
 #define SLJIT_SET_UNORDERED_OR_GREATER		SLJIT_SET(SLJIT_UNORDERED_OR_GREATER)
 #define SLJIT_ORDERED_LESS_EQUAL		33
-#define SLJIT_SET_ORDERED_LESS_EQUAL		SLJIT_SET(SLJIT_ORDERED_LESS_EQUAL)
+#define SLJIT_SET_ORDERED_LESS_EQUAL		SLJIT_SET(SLJIT_UNORDERED_OR_GREATER)
 
 /* Unconditional jump types. */
 #define SLJIT_JUMP			34
@@ -1658,19 +1687,42 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_op_flags(struct sljit_compiler *co
 	sljit_s32 dst, sljit_sw dstw,
 	sljit_s32 type);
 
-/* Emit a conditional mov instruction which moves source to destination,
-   if the condition is satisfied. Unlike other arithmetic operations this
-   instruction does not support memory access.
+/* Emit a conditional select instruction which moves src1 to dst_reg,
+   if the condition is satisfied, or src2_reg to dst_reg otherwise.
 
    type must be between SLJIT_EQUAL and SLJIT_ORDERED_LESS_EQUAL
-   type can be combined (or'ed) with SLJIT_32
-   dst_reg must be a valid register
-   src must be a valid register or immediate (SLJIT_IMM)
+   type can be combined (or'ed) with SLJIT_32 to move 32 bit
+       register values instead of word sized ones
+   dst_reg and src2_reg must be valid registers
+   src1 must be valid operand
+
+   Note: if src1 is a memory operand, its value
+         might be loaded even if the condition is false.
 
    Flags: - (does not modify flags) */
-SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_cmov(struct sljit_compiler *compiler, sljit_s32 type,
+SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_select(struct sljit_compiler *compiler, sljit_s32 type,
 	sljit_s32 dst_reg,
-	sljit_s32 src, sljit_sw srcw);
+	sljit_s32 src1, sljit_sw src1w,
+	sljit_s32 src2_reg);
+
+/* Emit a conditional floating point select instruction which moves
+   src1 to dst_reg, if the condition is satisfied, or src2_reg to
+   dst_reg otherwise.
+
+   type must be between SLJIT_EQUAL and SLJIT_ORDERED_LESS_EQUAL
+   type can be combined (or'ed) with SLJIT_32 to move 32 bit
+       floating point values instead of 64 bit ones
+   dst_freg and src2_freg must be valid floating point registers
+   src1 must be valid operand
+
+   Note: if src1 is a memory operand, its value
+         might be loaded even if the condition is false.
+
+   Flags: - (does not modify flags) */
+SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_fselect(struct sljit_compiler *compiler, sljit_s32 type,
+	sljit_s32 dst_freg,
+	sljit_s32 src1, sljit_sw src1w,
+	sljit_s32 src2_freg);
 
 /* The following flags are used by sljit_emit_mem(), sljit_emit_mem_update(),
    sljit_emit_fmem(), and sljit_emit_fmem_update(). */
