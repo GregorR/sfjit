@@ -27,7 +27,7 @@
 SLJIT_API_FUNC_ATTRIBUTE const char* sljit_get_platform_name(void)
 {
 #if (defined SLJIT_CONFIG_LOONGARCH_64 && SLJIT_CONFIG_LOONGARCH_64)
-	return "LOONGARCH-64" SLJIT_CPUINFO;
+	return "LOONGARCH" SLJIT_CPUINFO;
 #endif /* SLJIT_CONFIG_LOONGARCH_64 */
 }
 
@@ -262,6 +262,8 @@ lower parts in the instruction word, denoted by the “L” and “H” suffixes
 #define FDIV_D  OPC_3R(0x20e)
 #define FCMP_COND_S  OPC_4R(0xc1)
 #define FCMP_COND_D  OPC_4R(0xc2)
+#define FCOPYSIGN_S  OPC_3R(0x225)
+#define FCOPYSIGN_D  OPC_3R(0x226)
 #define FSEL  OPC_4R(0xd0)
 #define FABS_S  OPC_2R(0x4501)
 #define FABS_D  OPC_2R(0x4502)
@@ -2022,9 +2024,13 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_get_register_index(sljit_s32 reg)
 	return reg_map[reg];
 }
 
-SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_get_float_register_index(sljit_s32 reg)
+SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_get_float_register_index(sljit_s32 type, sljit_s32 reg)
 {
-	CHECK_REG_INDEX(check_sljit_get_float_register_index(reg));
+	CHECK_REG_INDEX(check_sljit_get_float_register_index(type, reg));
+
+	if (type != 0)
+		return -1;
+
 	return freg_map[reg];
 }
 
@@ -2351,18 +2357,17 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_fop2(struct sljit_compiler *compil
 	case SLJIT_ADD_F64:
 		FAIL_IF(push_inst(compiler, FINST(FADD, op) | FRD(dst_r) | FRJ(src1) | FRK(src2)));
 		break;
-
 	case SLJIT_SUB_F64:
 		FAIL_IF(push_inst(compiler, FINST(FSUB, op) | FRD(dst_r) | FRJ(src1) | FRK(src2)));
 		break;
-
 	case SLJIT_MUL_F64:
 		FAIL_IF(push_inst(compiler, FINST(FMUL, op) | FRD(dst_r) | FRJ(src1) | FRK(src2)));
 		break;
-
 	case SLJIT_DIV_F64:
 		FAIL_IF(push_inst(compiler, FINST(FDIV, op) | FRD(dst_r) | FRJ(src1) | FRK(src2)));
 		break;
+	case SLJIT_COPYSIGN_F64:
+		return push_inst(compiler, FINST(FCOPYSIGN, op) | FRD(dst_r) | FRJ(src1) | FRK(src2));
 	}
 
 	if (dst_r == TMP_FREG2)
