@@ -710,17 +710,21 @@ static SLJIT_INLINE sljit_uw sljit_get_generated_code_size(struct sljit_compiler
 #define SLJIT_HAS_COPY_F32		9
 /* [Emulated] Copy from/to f64 operation is available (see sljit_emit_fcopy). */
 #define SLJIT_HAS_COPY_F64		10
+/* [Not emulated] The 64 bit floating point registers can be used as
+   two separate 32 bit floating point registers (e.g. ARM32). The
+   second 32 bit part can be accessed by SLJIT_F64_SECOND. */
+#define SLJIT_HAS_F64_AS_F32_PAIR	11
 /* [Not emulated] Some SIMD operations are supported by the compiler. */
-#define SLJIT_HAS_SIMD			11
+#define SLJIT_HAS_SIMD			12
 /* [Not emulated] SIMD registers are mapped to a pair of double precision
    floating point registers. E.g. passing either SLJIT_FR0 or SLJIT_FR1 to
    a simd operation represents the same 128 bit register, and both SLJIT_FR0
    and SLJIT_FR1 are overwritten. */
-#define SLJIT_SIMD_REGS_ARE_PAIRS	12
+#define SLJIT_SIMD_REGS_ARE_PAIRS	13
 
 #if (defined SLJIT_CONFIG_X86 && SLJIT_CONFIG_X86)
-/* [Not emulated] SSE2 support is available on x86. */
-#define SLJIT_HAS_SSE2			100
+/* [Not emulated] AVX2 support is available on x86. */
+#define SLJIT_HAS_AVX2			100
 #endif
 
 SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_has_cpu_feature(sljit_s32 feature_type);
@@ -942,17 +946,17 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_pop(struct sljit_compiler *compile
 #define SLJIT_MEM0()		(SLJIT_MEM)
 #define SLJIT_MEM1(r1)		(SLJIT_MEM | (r1))
 #define SLJIT_MEM2(r1, r2)	(SLJIT_MEM | (r1) | ((r2) << 8))
-#define SLJIT_IMM		0x40
+#define SLJIT_IMM		0x7f
 #define SLJIT_REG_PAIR(r1, r2)	((r1) | ((r2) << 8))
 
 /* Macros for checking operand types (only for valid arguments). */
 #define SLJIT_IS_REG(arg)	((arg) > 0 && (arg) < SLJIT_IMM)
 #define SLJIT_IS_MEM(arg)	((arg) & SLJIT_MEM)
 #define SLJIT_IS_MEM0(arg)	((arg) == SLJIT_MEM)
-#define SLJIT_IS_MEM1(arg)	((arg) > SLJIT_MEM && (arg) < (SLJIT_MEM + SLJIT_IMM))
+#define SLJIT_IS_MEM1(arg)	((arg) > SLJIT_MEM && (arg) < (SLJIT_MEM << 1))
 #define SLJIT_IS_MEM2(arg)	(((arg) & SLJIT_MEM) && (arg) >= (SLJIT_MEM << 1))
 #define SLJIT_IS_IMM(arg)	((arg) == SLJIT_IMM)
-#define SLJIT_IS_REG_PAIR(arg)	(((arg) >> 8) != 0)
+#define SLJIT_IS_REG_PAIR(arg)	(!((arg) & SLJIT_MEM) && (arg) >= (SLJIT_MEM << 1))
 
 /* Sets 32 bit operation mode on 64 bit CPUs. This option is ignored on
    32 bit CPUs. When this option is set for an arithmetic operation, only
@@ -1949,6 +1953,10 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_fmem_update(struct sljit_compiler 
 #define SLJIT_SIMD_MEM_ALIGNED_64	(3 << 24)
 /* Memory address is 128 bit aligned */
 #define SLJIT_SIMD_MEM_ALIGNED_128	(4 << 24)
+/* Memory address is 256 bit aligned */
+#define SLJIT_SIMD_MEM_ALIGNED_256	(5 << 24)
+/* Memory address is 512 bit aligned */
+#define SLJIT_SIMD_MEM_ALIGNED_512	(6 << 24)
 
 /* Moves data between a simd register and memory.
 
