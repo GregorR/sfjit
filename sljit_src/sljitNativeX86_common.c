@@ -3512,8 +3512,8 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_atomic_store(struct sljit_compiler
 	CHECK_EXTRA_REGS(src_reg, srcw, (void)0);
 	CHECK_EXTRA_REGS(temp_reg, tempw, (void)0);
 
-	SLJIT_ASSERT(FAST_IS_REG(src_reg) || src_reg == SLJIT_MEM1(SLJIT_SP));
-	SLJIT_ASSERT(FAST_IS_REG(temp_reg) || temp_reg == SLJIT_MEM1(SLJIT_SP));
+	SLJIT_ASSERT(FAST_IS_REG(src_reg) || src_reg == SLJIT_MEM1(SLJIT_FRAMEP));
+	SLJIT_ASSERT(FAST_IS_REG(temp_reg) || temp_reg == SLJIT_MEM1(SLJIT_FRAMEP));
 
 	op = GET_OPCODE(op);
 #if (defined SLJIT_CONFIG_X86_32 && SLJIT_CONFIG_X86_32)
@@ -3543,7 +3543,7 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_atomic_store(struct sljit_compiler
 			mem_reg = free_reg;
 #else /* !SLJIT_CONFIG_X86_64 */
 		if (src_reg == TMP_REG1 && mem_reg == SLJIT_R0 && (free_reg & SLJIT_MEM)) {
-			EMIT_MOV(compiler, SLJIT_MEM1(SLJIT_SP), 0, SLJIT_R1, 0);
+			EMIT_MOV(compiler, SLJIT_MEM1(SLJIT_FRAMEP), 0, SLJIT_R1, 0);
 			EMIT_MOV(compiler, SLJIT_R1, 0, SLJIT_R0, 0);
 			EMIT_MOV(compiler, SLJIT_R0, 0, temp_reg, tempw);
 
@@ -3591,7 +3591,7 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_atomic_store(struct sljit_compiler
 #else /* !SLJIT_CONFIG_X86_64 */
 		EMIT_MOV(compiler, SLJIT_R0, 0, free_reg, 0);
 		if (free_reg != TMP_REG1)
-			return emit_mov(compiler, free_reg, 0, (free_reg == SLJIT_R1) ? SLJIT_MEM1(SLJIT_SP) : TMP_REG1, 0);
+			return emit_mov(compiler, free_reg, 0, (free_reg == SLJIT_R1) ? SLJIT_MEM1(SLJIT_FRAMEP) : TMP_REG1, 0);
 #endif /* SLJIT_CONFIG_X86_64 */
 	}
 	return SLJIT_SUCCESS;
