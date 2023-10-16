@@ -549,16 +549,12 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_enter(struct sljit_compiler *compi
 
 		tmp = SLJIT_FS0 - fsaveds;
 		for (i = SLJIT_FS0; i > tmp; i--) {
-			inst = emit_x86_instruction(compiler, 2 | EX86_SSE2, i, 0, SLJIT_MEM1(SLJIT_STACKP), saved_float_regs_offset);
-			inst[0] = GROUP_0F;
-			inst[1] = MOVAPS_xm_x;
+			FAIL_IF(emit_groupf(compiler, MOVAPS_xm_x, EX86_SSE2, i, SLJIT_MEM1(SLJIT_STACKP), saved_float_regs_offset));
 			saved_float_regs_offset += 16;
 		}
 
 		for (i = fscratches; i >= SLJIT_FIRST_SAVED_FLOAT_REG; i--) {
-			inst = emit_x86_instruction(compiler, 2 | EX86_SSE2, i, 0, SLJIT_MEM1(SLJIT_STACKP), saved_float_regs_offset);
-			inst[0] = GROUP_0F;
-			inst[1] = MOVAPS_xm_x;
+			FAIL_IF(emit_groupf(compiler, MOVAPS_xm_x, EX86_SSE2, i, SLJIT_MEM1(SLJIT_STACKP), saved_float_regs_offset));
 			saved_float_regs_offset += 16;
 		}
 	}
@@ -772,16 +768,12 @@ static sljit_s32 emit_stack_frame_release(struct sljit_compiler *compiler, sljit
 
 		tmp = SLJIT_FS0 - fsaveds;
 		for (i = SLJIT_FS0; i > tmp; i--) {
-			inst = emit_x86_instruction(compiler, 2 | EX86_SSE2, i, 0, SLJIT_MEM1(SLJIT_STACKP), saved_float_regs_offset);
-			inst[0] = GROUP_0F;
-			inst[1] = MOVAPS_x_xm;
+			FAIL_IF(emit_groupf(compiler, MOVAPS_x_xm, EX86_SSE2, i, SLJIT_MEM1(SLJIT_STACKP), saved_float_regs_offset));
 			saved_float_regs_offset += 16;
 		}
 
 		for (i = fscratches; i >= SLJIT_FIRST_SAVED_FLOAT_REG; i--) {
-			inst = emit_x86_instruction(compiler, 2 | EX86_SSE2, i, 0, SLJIT_MEM1(SLJIT_STACKP), saved_float_regs_offset);
-			inst[0] = GROUP_0F;
-			inst[1] = MOVAPS_x_xm;
+			FAIL_IF(emit_groupf(compiler, MOVAPS_x_xm, EX86_SSE2, i, SLJIT_MEM1(SLJIT_STACKP), saved_float_regs_offset));
 			saved_float_regs_offset += 16;
 		}
 
@@ -835,20 +827,13 @@ static sljit_s32 emit_stack_frame_release(struct sljit_compiler *compiler, sljit
 
 SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_return_void(struct sljit_compiler *compiler)
 {
-	sljit_u8 *inst;
-
 	CHECK_ERROR();
 	CHECK(check_sljit_emit_return_void(compiler));
 
 	compiler->mode32 = 0;
 
 	FAIL_IF(emit_stack_frame_release(compiler, 0));
-
-	inst = (sljit_u8*)ensure_buf(compiler, 1 + 1);
-	FAIL_IF(!inst);
-	INC_SIZE(1);
-	RET();
-	return SLJIT_SUCCESS;
+	return emit_byte(compiler, RET_near);
 }
 
 SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_return_to(struct sljit_compiler *compiler,
@@ -1047,13 +1032,8 @@ static sljit_s32 emit_fast_enter(struct sljit_compiler *compiler, sljit_s32 dst,
 	sljit_u8 *inst;
 
 	if (FAST_IS_REG(dst)) {
-		if (reg_map[dst] < 8) {
-			inst = (sljit_u8*)ensure_buf(compiler, 1 + 1);
-			FAIL_IF(!inst);
-			INC_SIZE(1);
-			POP_REG(reg_lmap[dst]);
-			return SLJIT_SUCCESS;
-		}
+		if (reg_map[dst] < 8)
+			return emit_byte(compiler, U8(POP_r + reg_lmap[dst]));
 
 		inst = (sljit_u8*)ensure_buf(compiler, 1 + 2);
 		FAIL_IF(!inst);
@@ -1593,10 +1573,7 @@ static SLJIT_INLINE sljit_s32 sljit_emit_fop1_conv_f64_from_uw(struct sljit_comp
 		} else
 			FAIL_IF(emit_do_imm32(compiler, reg_map[TMP_REG1] <= 7 ? 0 : REX_B, U8(MOV_r_i32 | reg_lmap[TMP_REG1]), srcw));
 
-		inst = emit_x86_instruction(compiler, 2 | ((op & SLJIT_32) ? EX86_PREF_F3 : EX86_PREF_F2) | EX86_SSE2_OP1, dst_r, 0, TMP_REG1, 0);
-		FAIL_IF(!inst);
-		inst[0] = GROUP_0F;
-		inst[1] = CVTSI2SD_x_rm;
+		FAIL_IF(emit_groupf(compiler, CVTSI2SD_x_rm, EX86_SELECT_F2_F3(op) | EX86_SSE2_OP1, dst_r, TMP_REG1, 0));
 
 		compiler->mode32 = 1;
 
@@ -1621,10 +1598,7 @@ static SLJIT_INLINE sljit_s32 sljit_emit_fop1_conv_f64_from_uw(struct sljit_comp
 	size1 = compiler->size;
 
 	compiler->mode32 = 0;
-	inst = emit_x86_instruction(compiler, 2 | ((op & SLJIT_32) ? EX86_PREF_F3 : EX86_PREF_F2) | EX86_SSE2_OP1, dst_r, 0, src, 0);
-	FAIL_IF(!inst);
-	inst[0] = GROUP_0F;
-	inst[1] = CVTSI2SD_x_rm;
+	FAIL_IF(emit_groupf(compiler, CVTSI2SD_x_rm, EX86_SELECT_F2_F3(op) | EX86_SSE2_OP1, dst_r, src, 0));
 
 	inst = (sljit_u8*)ensure_buf(compiler, 1 + 2);
 	FAIL_IF(!inst);
@@ -1653,13 +1627,9 @@ static SLJIT_INLINE sljit_s32 sljit_emit_fop1_conv_f64_from_uw(struct sljit_comp
 	FAIL_IF(!inst);
 	inst[0] = OR_r_rm;
 
-	inst = emit_x86_instruction(compiler, 2 | ((op & SLJIT_32) ? EX86_PREF_F3 : EX86_PREF_F2) | EX86_SSE2_OP1, dst_r, 0, TMP_REG1, 0);
-	FAIL_IF(!inst);
-	inst[0] = GROUP_0F;
-	inst[1] = CVTSI2SD_x_rm;
-
+	FAIL_IF(emit_groupf(compiler, CVTSI2SD_x_rm, EX86_SELECT_F2_F3(op) | EX86_SSE2_OP1, dst_r, TMP_REG1, 0));
 	compiler->mode32 = 1;
-	FAIL_IF(emit_sse2(compiler, ADDSD_x_xm, op & SLJIT_32, dst_r, dst_r, 0));
+	FAIL_IF(emit_groupf(compiler, ADDSD_x_xm, EX86_SELECT_F2_F3(op) | EX86_SSE2, dst_r, dst_r, 0));
 
 	jump_inst2[1] = U8(compiler->size - size2);
 

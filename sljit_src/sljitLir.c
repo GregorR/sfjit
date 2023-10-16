@@ -143,9 +143,10 @@
 #define SLJIT_KEPT_SAVEDS_COUNT(options) ((options) & 0x3)
 
 /* Getters for simd operations, which returns with log2(size). */
-#define SLJIT_SIMD_GET_REG_SIZE(type) (((type) >> 12) & 0x3f)
-#define SLJIT_SIMD_GET_ELEM_SIZE(type) (((type) >> 18) & 0x3f)
-#define SLJIT_SIMD_GET_ALIGNMENT(type) (((type) >> 24) & 0x3f)
+#define SLJIT_SIMD_GET_REG_SIZE(type)		(((type) >> 12) & 0x3f)
+#define SLJIT_SIMD_GET_ELEM_SIZE(type)		(((type) >> 18) & 0x3f)
+#define SLJIT_SIMD_GET_ALIGNMENT(type)		(((type) >> 24) & 0x3f)
+#define SLJIT_SIMD_GET_ELEM2_SIZE(type)		(((type) >> 24) & 0x3f)
 
 /* Jump flags. */
 #define JUMP_LABEL	0x1
@@ -470,7 +471,7 @@ SLJIT_API_FUNC_ATTRIBUTE struct sljit_compiler* sljit_create_compiler(void *allo
 
 #if (defined SLJIT_CONFIG_X86_32 && SLJIT_CONFIG_X86_32)
 	compiler->args_size = -1;
-#endif
+#endif /* SLJIT_CONFIG_X86_32 */
 
 #if (defined SLJIT_CONFIG_ARM_V6 && SLJIT_CONFIG_ARM_V6)
 	compiler->cpool = (sljit_uw*)SLJIT_MALLOC(CPOOL_SIZE * sizeof(sljit_uw)
@@ -483,18 +484,18 @@ SLJIT_API_FUNC_ATTRIBUTE struct sljit_compiler* sljit_create_compiler(void *allo
 	}
 	compiler->cpool_unique = (sljit_u8*)(compiler->cpool + CPOOL_SIZE);
 	compiler->cpool_diff = 0xffffffff;
-#endif
+#endif /* SLJIT_CONFIG_ARM_V6 */
 
 #if (defined SLJIT_CONFIG_MIPS && SLJIT_CONFIG_MIPS)
 	compiler->delay_slot = UNMOVABLE_INS;
-#endif
+#endif /* SLJIT_CONFIG_MIPS */
 
 #if (defined SLJIT_ARGUMENT_CHECKS && SLJIT_ARGUMENT_CHECKS) \
 		|| (defined SLJIT_DEBUG && SLJIT_DEBUG)
 	compiler->last_flags = 0;
 	compiler->last_return = -1;
 	compiler->logical_local_size = 0;
-#endif
+#endif /* SLJIT_ARGUMENT_CHECKS || SLJIT_DEBUG */
 
 #if (defined SLJIT_NEEDS_COMPILER_INIT && SLJIT_NEEDS_COMPILER_INIT)
 	if (!compiler_initialized) {
@@ -1417,6 +1418,13 @@ static SLJIT_INLINE CHECK_RETURN_TYPE check_sljit_emit_op1(struct sljit_compiler
 	CHECK_RETURN_OK;
 }
 
+/* experimental API, only implemented for: */
+
+#if (defined(SLJIT_CONFIG_X86) && SLJIT_CONFIG_X86) \
+	|| (defined(SLJIT_CONFIG_ARM) && SLJIT_CONFIG_ARM) \
+	|| (defined(SLJIT_CONFIG_S390X) && SLJIT_CONFIG_S390X) \
+	|| (defined(SLJIT_CONFIG_LOONGARCH) && SLJIT_CONFIG_LOONGARCH)
+
 static SLJIT_INLINE CHECK_RETURN_TYPE check_sljit_emit_atomic_load(struct sljit_compiler *compiler, sljit_s32 op,
 	sljit_s32 dst_reg,
 	sljit_s32 mem_reg)
@@ -1502,6 +1510,8 @@ static SLJIT_INLINE CHECK_RETURN_TYPE check_sljit_emit_atomic_store(struct sljit
 #endif /* SLJIT_VERBOSE */
 	CHECK_RETURN_OK;
 }
+
+#endif /* !SLJIT_CONFIG_PPC && !SLJIT_CONFIG_MIPS && !SLJIT_CONFIG_RISCV */
 
 static SLJIT_INLINE CHECK_RETURN_TYPE check_sljit_emit_op2(struct sljit_compiler *compiler, sljit_s32 op, sljit_s32 unset,
 	sljit_s32 dst, sljit_sw dstw,
@@ -1665,22 +1675,17 @@ static SLJIT_INLINE CHECK_RETURN_TYPE check_sljit_emit_op_dst(struct sljit_compi
 	CHECK_RETURN_OK;
 }
 
-static SLJIT_INLINE CHECK_RETURN_TYPE check_sljit_get_register_index(sljit_s32 reg)
-{
-	SLJIT_UNUSED_ARG(reg);
-#if (defined SLJIT_ARGUMENT_CHECKS && SLJIT_ARGUMENT_CHECKS)
-	CHECK_ARGUMENT(reg > 0 && reg <= SLJIT_NUMBER_OF_REGISTERS);
-#endif
-	CHECK_RETURN_OK;
-}
-
-static SLJIT_INLINE CHECK_RETURN_TYPE check_sljit_get_float_register_index(sljit_s32 type, sljit_s32 reg)
+static SLJIT_INLINE CHECK_RETURN_TYPE check_sljit_get_register_index(sljit_s32 type, sljit_s32 reg)
 {
 	SLJIT_UNUSED_ARG(type);
 	SLJIT_UNUSED_ARG(reg);
 #if (defined SLJIT_ARGUMENT_CHECKS && SLJIT_ARGUMENT_CHECKS)
-	CHECK_ARGUMENT(((type & 0xfff) == 0) && ((type >> 12) == 0 || ((type >> 12) >= 3 && (type >> 12) <= 6)));
-	CHECK_ARGUMENT(reg > 0 && reg <= SLJIT_NUMBER_OF_FLOAT_REGISTERS);
+	if (type == SLJIT_GP_REGISTER) {
+		CHECK_ARGUMENT(reg > 0 && reg <= SLJIT_NUMBER_OF_REGISTERS);
+	} else {
+		CHECK_ARGUMENT(type == SLJIT_FLOAT_REGISTER || ((type >> 12) == 0 || ((type >> 12) >= 3 && (type >> 12) <= 6)));
+		CHECK_ARGUMENT(reg > 0 && reg <= SLJIT_NUMBER_OF_FLOAT_REGISTERS);
+	}
 #endif
 	CHECK_RETURN_OK;
 }
@@ -2480,6 +2485,7 @@ static SLJIT_INLINE CHECK_RETURN_TYPE check_sljit_emit_fmem(struct sljit_compile
 	sljit_s32 mem, sljit_sw memw)
 {
 #if (defined SLJIT_ARGUMENT_CHECKS && SLJIT_ARGUMENT_CHECKS)
+	CHECK_ARGUMENT(sljit_has_cpu_feature(SLJIT_HAS_FPU));
 	CHECK_ARGUMENT((type & 0xff) == SLJIT_MOV_F64);
 
 	if (type & SLJIT_MEM_UNALIGNED) {
@@ -2523,6 +2529,7 @@ static SLJIT_INLINE CHECK_RETURN_TYPE check_sljit_emit_fmem_update(struct sljit_
 	sljit_s32 mem, sljit_sw memw)
 {
 #if (defined SLJIT_ARGUMENT_CHECKS && SLJIT_ARGUMENT_CHECKS)
+	CHECK_ARGUMENT(sljit_has_cpu_feature(SLJIT_HAS_FPU));
 	CHECK_ARGUMENT((type & 0xff) == SLJIT_MOV_F64);
 	CHECK_ARGUMENT((type & ~(0xff | SLJIT_32 | SLJIT_MEM_STORE | SLJIT_MEM_SUPP | SLJIT_MEM_POST)) == 0);
 	FUNCTION_CHECK_SRC_MEM(mem, memw);
@@ -2551,31 +2558,32 @@ static SLJIT_INLINE CHECK_RETURN_TYPE check_sljit_emit_fmem_update(struct sljit_
 	CHECK_RETURN_OK;
 }
 
-static SLJIT_INLINE CHECK_RETURN_TYPE check_sljit_emit_simd_mem(struct sljit_compiler *compiler, sljit_s32 type,
+static SLJIT_INLINE CHECK_RETURN_TYPE check_sljit_emit_simd_mov(struct sljit_compiler *compiler, sljit_s32 type,
 	sljit_s32 freg,
-	sljit_s32 mem, sljit_sw memw)
+	sljit_s32 srcdst, sljit_sw srcdstw)
 {
 #if (defined SLJIT_ARGUMENT_CHECKS && SLJIT_ARGUMENT_CHECKS)
-	CHECK_ARGUMENT((type & (sljit_s32)(0xc0000fff - (SLJIT_SIMD_MEM_STORE | SLJIT_SIMD_MEM_FLOAT | SLJIT_SIMD_MEM_TEST))) == 0);
-	CHECK_ARGUMENT((type & 0x3f000) >= SLJIT_SIMD_MEM_REG_64 && (type & 0x3f000) <= SLJIT_SIMD_MEM_REG_512);
+	CHECK_ARGUMENT(sljit_has_cpu_feature(SLJIT_HAS_SIMD));
+	CHECK_ARGUMENT((type & (sljit_s32)(0xc0000fff - (SLJIT_SIMD_STORE | SLJIT_SIMD_FLOAT | SLJIT_SIMD_TEST))) == 0);
+	CHECK_ARGUMENT((type & 0x3f000) >= SLJIT_SIMD_REG_64 && (type & 0x3f000) <= SLJIT_SIMD_REG_512);
 	CHECK_ARGUMENT(SLJIT_SIMD_GET_ELEM_SIZE(type) <= SLJIT_SIMD_GET_REG_SIZE(type));
-	CHECK_ARGUMENT(SLJIT_SIMD_GET_ALIGNMENT(type) <= SLJIT_SIMD_GET_REG_SIZE(type));
-	FUNCTION_CHECK_SRC_MEM(mem, memw);
+	CHECK_ARGUMENT(SLJIT_SIMD_GET_ALIGNMENT(type) <= (srcdst & SLJIT_MEM) ? SLJIT_SIMD_GET_REG_SIZE(type) : 0);
 	CHECK_ARGUMENT(FUNCTION_CHECK_IS_FREG(freg));
+	FUNCTION_FCHECK(srcdst, srcdstw);
 #endif
 #if (defined SLJIT_VERBOSE && SLJIT_VERBOSE)
 	if (SLJIT_UNLIKELY(!!compiler->verbose)) {
-		if (type & SLJIT_SIMD_MEM_TEST)
+		if (type & SLJIT_SIMD_TEST)
 			CHECK_RETURN_OK;
-		if (sljit_emit_simd_mem(compiler, type | SLJIT_SIMD_MEM_TEST, freg, mem, memw) == SLJIT_ERR_UNSUPPORTED) {
+		if (sljit_emit_simd_mov(compiler, type | SLJIT_SIMD_TEST, freg, srcdst, srcdstw) == SLJIT_ERR_UNSUPPORTED) {
 			fprintf(compiler->verbose, "    # simd_mem: unsupported form, no instructions are emitted\n");
 			CHECK_RETURN_OK;
 		}
 
-		fprintf(compiler->verbose, "  %s.%d.%s%d",
-			(type & SLJIT_MEM_STORE) ? "store" : "load",
+		fprintf(compiler->verbose, "  simd_%s.%d.%s%d",
+			(type & SLJIT_SIMD_STORE) ? "store" : "load",
 			(8 << SLJIT_SIMD_GET_REG_SIZE(type)),
-			(type & SLJIT_SIMD_MEM_FLOAT) ? "f" : "",
+			(type & SLJIT_SIMD_FLOAT) ? "f" : "",
 			(8 << SLJIT_SIMD_GET_ELEM_SIZE(type)));
 
 		if ((type & 0x3f000000) == SLJIT_SIMD_MEM_UNALIGNED)
@@ -2585,7 +2593,218 @@ static SLJIT_INLINE CHECK_RETURN_TYPE check_sljit_emit_simd_mem(struct sljit_com
 
 		sljit_verbose_freg(compiler, freg);
 		fprintf(compiler->verbose, ", ");
-		sljit_verbose_param(compiler, mem, memw);
+		sljit_verbose_fparam(compiler, srcdst, srcdstw);
+		fprintf(compiler->verbose, "\n");
+	}
+#endif
+	CHECK_RETURN_OK;
+}
+
+static SLJIT_INLINE CHECK_RETURN_TYPE check_sljit_emit_simd_replicate(struct sljit_compiler *compiler, sljit_s32 type,
+	sljit_s32 freg,
+	sljit_s32 src, sljit_sw srcw)
+{
+#if (defined SLJIT_ARGUMENT_CHECKS && SLJIT_ARGUMENT_CHECKS)
+	CHECK_ARGUMENT(sljit_has_cpu_feature(SLJIT_HAS_SIMD));
+	CHECK_ARGUMENT((type & (sljit_s32)(0xff000fff - (SLJIT_SIMD_FLOAT | SLJIT_SIMD_TEST))) == 0);
+	CHECK_ARGUMENT((type & 0x3f000) >= SLJIT_SIMD_REG_64 && (type & 0x3f000) <= SLJIT_SIMD_REG_512);
+	CHECK_ARGUMENT(SLJIT_SIMD_GET_ELEM_SIZE(type) < SLJIT_SIMD_GET_REG_SIZE(type));
+	CHECK_ARGUMENT(FUNCTION_CHECK_IS_FREG(freg));
+
+	if (type & SLJIT_SIMD_FLOAT) {
+		if (src == SLJIT_IMM) {
+			CHECK_ARGUMENT(srcw == 0);
+		} else {
+			FUNCTION_FCHECK(src, srcw);
+		}
+	} else if (src != SLJIT_IMM) {
+		FUNCTION_CHECK_DST(src, srcw);
+	}
+#endif
+#if (defined SLJIT_VERBOSE && SLJIT_VERBOSE)
+	if (SLJIT_UNLIKELY(!!compiler->verbose)) {
+		if (type & SLJIT_SIMD_TEST)
+			CHECK_RETURN_OK;
+		if (sljit_emit_simd_replicate(compiler, type | SLJIT_SIMD_TEST, freg, src, srcw) == SLJIT_ERR_UNSUPPORTED) {
+			fprintf(compiler->verbose, "    # simd_dup: unsupported form, no instructions are emitted\n");
+			CHECK_RETURN_OK;
+		}
+
+		fprintf(compiler->verbose, "  simd_replicate.%d.%s%d ",
+			(8 << SLJIT_SIMD_GET_REG_SIZE(type)),
+			(type & SLJIT_SIMD_FLOAT) ? "f" : "",
+			(8 << SLJIT_SIMD_GET_ELEM_SIZE(type)));
+
+		sljit_verbose_freg(compiler, freg);
+		fprintf(compiler->verbose, ", ");
+		if (type & SLJIT_SIMD_FLOAT)
+			sljit_verbose_fparam(compiler, src, srcw);
+		else
+			sljit_verbose_param(compiler, src, srcw);
+		fprintf(compiler->verbose, "\n");
+	}
+#endif
+	CHECK_RETURN_OK;
+}
+
+static SLJIT_INLINE CHECK_RETURN_TYPE check_sljit_emit_simd_lane_mov(struct sljit_compiler *compiler, sljit_s32 type,
+	sljit_s32 freg, sljit_s32 lane_index,
+	sljit_s32 srcdst, sljit_sw srcdstw)
+{
+#if (defined SLJIT_ARGUMENT_CHECKS && SLJIT_ARGUMENT_CHECKS)
+	CHECK_ARGUMENT(sljit_has_cpu_feature(SLJIT_HAS_SIMD));
+	CHECK_ARGUMENT((type & (sljit_s32)(0xff000fff - (SLJIT_SIMD_STORE | SLJIT_SIMD_LANE_ZERO | SLJIT_SIMD_LANE_SIGNED | SLJIT_32 | SLJIT_SIMD_FLOAT | SLJIT_SIMD_TEST))) == 0);
+	CHECK_ARGUMENT((type & (SLJIT_SIMD_STORE | SLJIT_SIMD_LANE_ZERO)) != (SLJIT_SIMD_STORE | SLJIT_SIMD_LANE_ZERO));
+	CHECK_ARGUMENT((type & (SLJIT_SIMD_STORE | SLJIT_SIMD_LANE_SIGNED)) != SLJIT_SIMD_LANE_SIGNED);
+	CHECK_ARGUMENT(!(type & SLJIT_SIMD_FLOAT) || !(type & (SLJIT_SIMD_LANE_SIGNED | SLJIT_32)));
+	CHECK_ARGUMENT((type & 0x3f000) >= SLJIT_SIMD_REG_64 && (type & 0x3f000) <= SLJIT_SIMD_REG_512);
+	CHECK_ARGUMENT(SLJIT_SIMD_GET_ELEM_SIZE(type) < SLJIT_SIMD_GET_REG_SIZE(type));
+	CHECK_ARGUMENT(!(type & SLJIT_32) || SLJIT_SIMD_GET_ELEM_SIZE(type) <= 2);
+	CHECK_ARGUMENT(FUNCTION_CHECK_IS_FREG(freg));
+	CHECK_ARGUMENT(lane_index >= 0 && lane_index < (1 << (SLJIT_SIMD_GET_REG_SIZE(type) - SLJIT_SIMD_GET_ELEM_SIZE(type))));
+
+	if (type & SLJIT_SIMD_FLOAT) {
+		FUNCTION_FCHECK(srcdst, srcdstw);
+	} else if ((type & SLJIT_SIMD_STORE) || (srcdst != SLJIT_IMM)) {
+		FUNCTION_CHECK_DST(srcdst, srcdstw);
+	}
+#endif
+#if (defined SLJIT_VERBOSE && SLJIT_VERBOSE)
+	if (SLJIT_UNLIKELY(!!compiler->verbose)) {
+		if (type & SLJIT_SIMD_TEST)
+			CHECK_RETURN_OK;
+		if (sljit_emit_simd_lane_mov(compiler, type | SLJIT_SIMD_TEST, freg, lane_index, srcdst, srcdstw) == SLJIT_ERR_UNSUPPORTED) {
+			fprintf(compiler->verbose, "    # simd_move_lane: unsupported form, no instructions are emitted\n");
+			CHECK_RETURN_OK;
+		}
+
+		fprintf(compiler->verbose, "  simd_%s_lane%s%s%s.%d.%s%d ",
+			(type & SLJIT_SIMD_STORE) ? "store" : "load",
+			(type & SLJIT_32) ? "32" : "",
+			(type & SLJIT_SIMD_LANE_ZERO) ? "_z" : "",
+			(type & SLJIT_SIMD_LANE_SIGNED) ? "_s" : "",
+			(8 << SLJIT_SIMD_GET_REG_SIZE(type)),
+			(type & SLJIT_SIMD_FLOAT) ? "f" : "",
+			(8 << SLJIT_SIMD_GET_ELEM_SIZE(type)));
+
+		sljit_verbose_freg(compiler, freg);
+		fprintf(compiler->verbose, "[%d], ", lane_index);
+		if (type & SLJIT_SIMD_FLOAT)
+			sljit_verbose_fparam(compiler, srcdst, srcdstw);
+		else
+			sljit_verbose_param(compiler, srcdst, srcdstw);
+		fprintf(compiler->verbose, "\n");
+	}
+#endif
+	CHECK_RETURN_OK;
+}
+
+static SLJIT_INLINE CHECK_RETURN_TYPE check_sljit_emit_simd_lane_replicate(struct sljit_compiler *compiler, sljit_s32 type,
+	sljit_s32 freg,
+	sljit_s32 src, sljit_s32 src_lane_index)
+{
+#if (defined SLJIT_ARGUMENT_CHECKS && SLJIT_ARGUMENT_CHECKS)
+	CHECK_ARGUMENT(sljit_has_cpu_feature(SLJIT_HAS_SIMD));
+	CHECK_ARGUMENT((type & (sljit_s32)(0xff000fff - (SLJIT_SIMD_FLOAT | SLJIT_SIMD_TEST))) == 0);
+	CHECK_ARGUMENT((type & 0x3f000) >= SLJIT_SIMD_REG_64 && (type & 0x3f000) <= SLJIT_SIMD_REG_512);
+	CHECK_ARGUMENT(SLJIT_SIMD_GET_ELEM_SIZE(type) < SLJIT_SIMD_GET_REG_SIZE(type));
+	CHECK_ARGUMENT(FUNCTION_CHECK_IS_FREG(freg));
+	CHECK_ARGUMENT(FUNCTION_CHECK_IS_FREG(src));
+	CHECK_ARGUMENT(src_lane_index >= 0 && src_lane_index < (1 << (SLJIT_SIMD_GET_REG_SIZE(type) - SLJIT_SIMD_GET_ELEM_SIZE(type))));
+#endif
+#if (defined SLJIT_VERBOSE && SLJIT_VERBOSE)
+	if (SLJIT_UNLIKELY(!!compiler->verbose)) {
+		if (type & SLJIT_SIMD_TEST)
+			CHECK_RETURN_OK;
+		if (sljit_emit_simd_lane_replicate(compiler, type | SLJIT_SIMD_TEST, freg, src, src_lane_index) == SLJIT_ERR_UNSUPPORTED) {
+			fprintf(compiler->verbose, "    # simd_lane_replicate: unsupported form, no instructions are emitted\n");
+			CHECK_RETURN_OK;
+		}
+
+		fprintf(compiler->verbose, "  simd_lane_replicate.%d.%s%d ",
+			(8 << SLJIT_SIMD_GET_REG_SIZE(type)),
+			(type & SLJIT_SIMD_FLOAT) ? "f" : "",
+			(8 << SLJIT_SIMD_GET_ELEM_SIZE(type)));
+
+		sljit_verbose_freg(compiler, freg);
+		fprintf(compiler->verbose, ", ");
+		sljit_verbose_freg(compiler, src);
+		fprintf(compiler->verbose, "[%d]\n", src_lane_index);
+	}
+#endif
+	CHECK_RETURN_OK;
+}
+
+static SLJIT_INLINE CHECK_RETURN_TYPE check_sljit_emit_simd_extend(struct sljit_compiler *compiler, sljit_s32 type,
+	sljit_s32 freg,
+	sljit_s32 src, sljit_sw srcw)
+{
+#if (defined SLJIT_ARGUMENT_CHECKS && SLJIT_ARGUMENT_CHECKS)
+	CHECK_ARGUMENT(sljit_has_cpu_feature(SLJIT_HAS_SIMD));
+	CHECK_ARGUMENT((type & (sljit_s32)(0xc0000fff - (SLJIT_SIMD_EXTEND_SIGNED | SLJIT_SIMD_FLOAT | SLJIT_SIMD_TEST))) == 0);
+	CHECK_ARGUMENT((type & (SLJIT_SIMD_EXTEND_SIGNED | SLJIT_SIMD_FLOAT)) != (SLJIT_SIMD_EXTEND_SIGNED | SLJIT_SIMD_FLOAT));
+	CHECK_ARGUMENT((type & 0x3f000) >= SLJIT_SIMD_REG_64 && (type & 0x3f000) <= SLJIT_SIMD_REG_512);
+	CHECK_ARGUMENT(SLJIT_SIMD_GET_ELEM2_SIZE(type) < SLJIT_SIMD_GET_REG_SIZE(type));
+	CHECK_ARGUMENT(SLJIT_SIMD_GET_ELEM_SIZE(type) < SLJIT_SIMD_GET_ELEM2_SIZE(type));
+	CHECK_ARGUMENT(FUNCTION_CHECK_IS_FREG(freg));
+	FUNCTION_FCHECK(src, srcw);
+#endif
+#if (defined SLJIT_VERBOSE && SLJIT_VERBOSE)
+	if (SLJIT_UNLIKELY(!!compiler->verbose)) {
+		if (type & SLJIT_SIMD_TEST)
+			CHECK_RETURN_OK;
+		if (sljit_emit_simd_extend(compiler, type | SLJIT_SIMD_TEST, freg, src, srcw) == SLJIT_ERR_UNSUPPORTED) {
+			fprintf(compiler->verbose, "    # simd_extend: unsupported form, no instructions are emitted\n");
+			CHECK_RETURN_OK;
+		}
+
+		fprintf(compiler->verbose, "  simd_load_extend%s.%d.%s%d.%s%d ",
+			(type & SLJIT_SIMD_EXTEND_SIGNED) ? "_s" : "",
+			(8 << SLJIT_SIMD_GET_REG_SIZE(type)),
+			(type & SLJIT_SIMD_FLOAT) ? "f" : "",
+			(8 << SLJIT_SIMD_GET_ELEM2_SIZE(type)),
+			(type & SLJIT_SIMD_FLOAT) ? "f" : "",
+			(8 << SLJIT_SIMD_GET_ELEM_SIZE(type)));
+
+		sljit_verbose_freg(compiler, freg);
+		fprintf(compiler->verbose, ", ");
+		sljit_verbose_fparam(compiler, src, srcw);
+		fprintf(compiler->verbose, "\n");
+	}
+#endif
+	CHECK_RETURN_OK;
+}
+
+static SLJIT_INLINE CHECK_RETURN_TYPE check_sljit_emit_simd_sign(struct sljit_compiler *compiler, sljit_s32 type,
+	sljit_s32 freg,
+	sljit_s32 dst, sljit_sw dstw)
+{
+#if (defined SLJIT_ARGUMENT_CHECKS && SLJIT_ARGUMENT_CHECKS)
+	CHECK_ARGUMENT(sljit_has_cpu_feature(SLJIT_HAS_SIMD));
+	CHECK_ARGUMENT((type & (sljit_s32)(0xff000fff - (SLJIT_SIMD_FLOAT | SLJIT_SIMD_TEST | SLJIT_32))) == SLJIT_SIMD_STORE);
+	CHECK_ARGUMENT((type & 0x3f000) >= SLJIT_SIMD_REG_64 && (type & 0x3f000) <= SLJIT_SIMD_REG_512);
+	CHECK_ARGUMENT(SLJIT_SIMD_GET_ELEM_SIZE(type) < SLJIT_SIMD_GET_REG_SIZE(type));
+	CHECK_ARGUMENT(FUNCTION_CHECK_IS_FREG(freg));
+	FUNCTION_CHECK_DST(dst, dstw);
+#endif
+#if (defined SLJIT_VERBOSE && SLJIT_VERBOSE)
+	if (SLJIT_UNLIKELY(!!compiler->verbose)) {
+		if (type & SLJIT_SIMD_TEST)
+			CHECK_RETURN_OK;
+		if (sljit_emit_simd_sign(compiler, type | SLJIT_SIMD_TEST, freg, dst, dstw) == SLJIT_ERR_UNSUPPORTED) {
+			fprintf(compiler->verbose, "    # simd_sign: unsupported form, no instructions are emitted\n");
+			CHECK_RETURN_OK;
+		}
+
+		fprintf(compiler->verbose, "  simd_store_sign%s.%d.%s%d ",
+			(type & SLJIT_32) ? "32" : "",
+			(8 << SLJIT_SIMD_GET_REG_SIZE(type)),
+			(type & SLJIT_SIMD_FLOAT) ? "f" : "",
+			(8 << SLJIT_SIMD_GET_ELEM_SIZE(type)));
+
+		sljit_verbose_freg(compiler, freg);
+		fprintf(compiler->verbose, ", ");
+		sljit_verbose_param(compiler, dst, dstw);
 		fprintf(compiler->verbose, "\n");
 	}
 #endif
@@ -2988,12 +3207,93 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_fmem_update(struct sljit_compiler 
 #if !(defined SLJIT_CONFIG_X86 && SLJIT_CONFIG_X86) \
 	&& !(defined SLJIT_CONFIG_ARM && SLJIT_CONFIG_ARM)
 
-SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_simd_mem(struct sljit_compiler *compiler, sljit_s32 type,
+SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_simd_mov(struct sljit_compiler *compiler, sljit_s32 type,
 	sljit_s32 freg,
-	sljit_s32 mem, sljit_sw memw)
+	sljit_s32 srcdst, sljit_sw srcdstw)
 {
 	CHECK_ERROR();
-	CHECK(check_sljit_emit_simd_mem(compiler, type, freg, mem, memw));
+	CHECK(check_sljit_emit_simd_mov(compiler, type, freg, srcdst, srcdstw));
+	SLJIT_UNUSED_ARG(compiler);
+	SLJIT_UNUSED_ARG(type);
+	SLJIT_UNUSED_ARG(freg);
+	SLJIT_UNUSED_ARG(srcdst);
+	SLJIT_UNUSED_ARG(srcdstw);
+
+	return SLJIT_ERR_UNSUPPORTED;
+}
+
+SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_simd_replicate(struct sljit_compiler *compiler, sljit_s32 type,
+	sljit_s32 freg,
+	sljit_s32 src, sljit_sw srcw)
+{
+	CHECK_ERROR();
+	CHECK(check_sljit_emit_simd_replicate(compiler, type, freg, src, srcw));
+	SLJIT_UNUSED_ARG(compiler);
+	SLJIT_UNUSED_ARG(type);
+	SLJIT_UNUSED_ARG(freg);
+	SLJIT_UNUSED_ARG(src);
+	SLJIT_UNUSED_ARG(srcw);
+
+	return SLJIT_ERR_UNSUPPORTED;
+}
+
+SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_simd_lane_mov(struct sljit_compiler *compiler, sljit_s32 type,
+	sljit_s32 freg, sljit_s32 lane_index,
+	sljit_s32 srcdst, sljit_sw srcdstw)
+{
+	CHECK_ERROR();
+	CHECK(check_sljit_emit_simd_lane_mov(compiler, type, freg, lane_index, srcdst, srcdstw));
+	SLJIT_UNUSED_ARG(compiler);
+	SLJIT_UNUSED_ARG(type);
+	SLJIT_UNUSED_ARG(freg);
+	SLJIT_UNUSED_ARG(lane_index);
+	SLJIT_UNUSED_ARG(srcdst);
+	SLJIT_UNUSED_ARG(srcdstw);
+
+	return SLJIT_ERR_UNSUPPORTED;
+}
+
+SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_simd_lane_replicate(struct sljit_compiler *compiler, sljit_s32 type,
+	sljit_s32 freg,
+	sljit_s32 src, sljit_s32 src_lane_index)
+{
+	CHECK_ERROR();
+	CHECK(check_sljit_emit_simd_lane_replicate(compiler, type, freg, src, src_lane_index));
+	SLJIT_UNUSED_ARG(compiler);
+	SLJIT_UNUSED_ARG(type);
+	SLJIT_UNUSED_ARG(freg);
+	SLJIT_UNUSED_ARG(src);
+	SLJIT_UNUSED_ARG(src_lane_index);
+
+	return SLJIT_ERR_UNSUPPORTED;
+}
+
+SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_simd_extend(struct sljit_compiler *compiler, sljit_s32 type,
+	sljit_s32 freg,
+	sljit_s32 src, sljit_sw srcw)
+{
+	CHECK_ERROR();
+	CHECK(check_sljit_emit_simd_extend(compiler, type, freg, src, srcw));
+	SLJIT_UNUSED_ARG(compiler);
+	SLJIT_UNUSED_ARG(type);
+	SLJIT_UNUSED_ARG(freg);
+	SLJIT_UNUSED_ARG(src);
+	SLJIT_UNUSED_ARG(srcw);
+
+	return SLJIT_ERR_UNSUPPORTED;
+}
+
+SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_simd_sign(struct sljit_compiler *compiler, sljit_s32 type,
+	sljit_s32 freg,
+	sljit_s32 dst, sljit_sw dstw)
+{
+	CHECK_ERROR();
+	CHECK(check_sljit_emit_simd_sign(compiler, type, freg, dst, dstw));
+	SLJIT_UNUSED_ARG(compiler);
+	SLJIT_UNUSED_ARG(type);
+	SLJIT_UNUSED_ARG(freg);
+	SLJIT_UNUSED_ARG(dst);
+	SLJIT_UNUSED_ARG(dstw);
 
 	return SLJIT_ERR_UNSUPPORTED;
 }

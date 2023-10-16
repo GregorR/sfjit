@@ -2649,17 +2649,14 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_op_dst(struct sljit_compiler *comp
 	return SLJIT_SUCCESS;
 }
 
-SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_get_register_index(sljit_s32 reg)
+SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_get_register_index(sljit_s32 type, sljit_s32 reg)
 {
-	CHECK_REG_INDEX(check_sljit_get_register_index(reg));
-	return reg_map[reg];
-}
+	CHECK_REG_INDEX(check_sljit_get_register_index(type, reg));
 
-SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_get_float_register_index(sljit_s32 type, sljit_s32 reg)
-{
-	CHECK_REG_INDEX(check_sljit_get_float_register_index(type, reg));
+	if (type == SLJIT_GP_REGISTER)
+		return reg_map[reg];
 
-	if (type != 0)
+	if (type != SLJIT_FLOAT_REGISTER)
 		return -1;
 
 	return FR(reg);
@@ -3597,6 +3594,7 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_select(struct sljit_compiler *comp
 
 	CHECK_ERROR();
 	CHECK(check_sljit_emit_select(compiler, type, dst_reg, src1, src1w, src2_reg));
+	ADJUST_LOCAL_OFFSET(src1, src1w);
 
 #if (defined SLJIT_MIPS_REV && SLJIT_MIPS_REV >= 1 && SLJIT_MIPS_REV < 6)
 	if (src1 & SLJIT_MEM) {
