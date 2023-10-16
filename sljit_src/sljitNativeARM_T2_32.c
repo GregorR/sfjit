@@ -122,7 +122,6 @@ static const sljit_u8 farg_regs[FLOAT_ARG_REGS] = {
 #define BKPT		0xbe00
 #define BLX		0x4780
 #define BX		0x4700
-#define CLREX		0xf3bf8f2f
 #define CLZ		0xfab0f080
 #define CMNI_W		0xf1100f00
 #define CMP		0x4280
@@ -134,12 +133,11 @@ static const sljit_u8 farg_regs[FLOAT_ARG_REGS] = {
 #define EORS		0x4040
 #define EOR_W		0xea800000
 #define IT		0xbf00
-#define LDR_SP		0x9800
 #define LDAEX		0xe8d00fef
 #define LDAEXB		0xe8d00fcf
-#define LDAEXD		0xe8d000ff
 #define LDAEXH		0xe8d00fdf
 #define LDR		0xf8d00000
+#define LDR_SP		0x9800
 #define LDRD		0xe9500000
 #define LDRI		0xf8500800
 #define LSLS		0x4080
@@ -185,12 +183,11 @@ static const sljit_u8 farg_regs[FLOAT_ARG_REGS] = {
 #define SBC_W		0xeb600000
 #define SDIV		0xfb90f0f0
 #define SMULL		0xfb800000
-#define STLEX		0xe8c00fe0
-#define STLEXB		0xe8c00fc0
-#define STLEXD		0xe8c000f0
-#define STLEXH		0xe8c00fd0
-#define STRD		0xe9400000
 #define STR_SP		0x9000
+#define STRD		0xe9400000
+#define STREX		0xe8c00fe0
+#define STREXB		0xe8c00fc0
+#define STREXH		0xe8c00fd0
 #define SUBS		0x1a00
 #define SUBSI3		0x1e00
 #define SUBSI8		0x3800
@@ -2392,6 +2389,66 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_fop2(struct sljit_compiler *compil
 	return emit_fop_mem(compiler, (op & SLJIT_32), TMP_FREG1, dst, dstw);
 }
 
+SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_fset32(struct sljit_compiler *compiler,
+	sljit_s32 freg, sljit_f32 value)
+{
+	sljit_u32 exp;
+	sljit_ins ins;
+	union {
+		sljit_u32 imm;
+		sljit_f32 value;
+	} u;
+
+	CHECK_ERROR();
+	CHECK(check_sljit_emit_fset32(compiler, freg, value));
+
+	u.value = value;
+
+	if ((u.imm << (32 - 19)) == 0) {
+		exp = (u.imm >> (23 + 2)) & 0x3f;
+
+		if (exp == 0x20 || exp == 0x1f) {
+			ins = ((u.imm >> 24) & 0x80) | ((u.imm >> 19) & 0x7f);
+			return push_inst32(compiler, (VMOV_F32 ^ (1 << 6)) | ((ins & 0xf0) << 12) | DD4(freg) | (ins & 0xf));
+		}
+	}
+
+	FAIL_IF(load_immediate(compiler, TMP_REG1, u.imm));
+	return push_inst32(compiler, VMOV | DN4(freg) | RT4(TMP_REG1));
+}
+
+SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_fset64(struct sljit_compiler *compiler,
+	sljit_s32 freg, sljit_f64 value)
+{
+	sljit_u32 exp;
+	sljit_ins ins;
+	union {
+		sljit_u32 imm[2];
+		sljit_f64 value;
+	} u;
+
+	CHECK_ERROR();
+	CHECK(check_sljit_emit_fset64(compiler, freg, value));
+
+	u.value = value;
+
+	if (u.imm[0] == 0 && (u.imm[1] << (64 - 48)) == 0) {
+		exp = (u.imm[1] >> ((52 - 32) + 2)) & 0x1ff;
+
+		if (exp == 0x100 || exp == 0xff) {
+			ins = ((u.imm[1] >> (56 - 32)) & 0x80) | ((u.imm[1] >> (48 - 32)) & 0x7f);
+			return push_inst32(compiler, (VMOV_F32 ^ (1 << 6)) | (1 << 8) | ((ins & 0xf0) << 12) | DD4(freg) | (ins & 0xf));
+		}
+	}
+
+	FAIL_IF(load_immediate(compiler, TMP_REG1, u.imm[0]));
+	if (u.imm[0] == u.imm[1])
+		return push_inst32(compiler, VMOV2 | RN4(TMP_REG1) | RT4(TMP_REG1) | DM4(freg));
+
+	FAIL_IF(load_immediate(compiler, TMP_REG2, u.imm[1]));
+	return push_inst32(compiler, VMOV2 | RN4(TMP_REG2) | RT4(TMP_REG1) | DM4(freg));
+}
+
 SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_fcopy(struct sljit_compiler *compiler, sljit_s32 op,
 	sljit_s32 freg, sljit_s32 reg)
 {
@@ -2651,12 +2708,14 @@ static sljit_uw get_cc(struct sljit_compiler *compiler, sljit_s32 type)
 {
 	switch (type) {
 	case SLJIT_EQUAL:
+	case SLJIT_ATOMIC_STORED:
 	case SLJIT_F_EQUAL:
 	case SLJIT_ORDERED_EQUAL:
 	case SLJIT_UNORDERED_OR_EQUAL:
 		return 0x0;
 
 	case SLJIT_NOT_EQUAL:
+	case SLJIT_ATOMIC_NOT_STORED:
 	case SLJIT_F_NOT_EQUAL:
 	case SLJIT_UNORDERED_OR_NOT_EQUAL:
 	case SLJIT_ORDERED_NOT_EQUAL:
@@ -3625,6 +3684,56 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_fmem(struct sljit_compiler *compil
 
 #undef FPU_LOAD
 
+SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_atomic_load(struct sljit_compiler *compiler, sljit_s32 op,
+	sljit_s32 dst_reg,
+	sljit_s32 mem_reg)
+{
+	sljit_ins ins = 0;
+
+	CHECK_ERROR();
+	CHECK(check_sljit_emit_atomic_load(compiler, op, dst_reg, mem_reg));
+
+	switch (GET_OPCODE(op)) {
+	case SLJIT_MOV_U8:
+		ins = LDAEXB;
+		break;
+	case SLJIT_MOV_U16:
+		ins = LDAEXH;
+		break;
+	default:
+		ins = LDAEX;
+		break;
+	}
+
+	return push_inst32(compiler, ins | RN4(mem_reg) | RT4(dst_reg));
+}
+
+SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_atomic_store(struct sljit_compiler *compiler, sljit_s32 op,
+	sljit_s32 src_reg,
+	sljit_s32 mem_reg,
+	sljit_s32 temp_reg)
+{
+	sljit_ins ins = 0;
+
+	CHECK_ERROR();
+	CHECK(check_sljit_emit_atomic_store(compiler, op, src_reg, mem_reg, temp_reg));
+
+	switch (GET_OPCODE(op)) {
+	case SLJIT_MOV_U8:
+		ins = STREXB;
+		break;
+	case SLJIT_MOV_U16:
+		ins = STREXH;
+		break;
+	default:
+		ins = STREX;
+		break;
+	}
+
+	FAIL_IF(push_inst32(compiler, ins | RN4(mem_reg) | RT4(src_reg)| RM4(TMP_REG1)));
+	return push_inst32(compiler, CMPI_W | RN4(TMP_REG1) | 0);
+}
+
 SLJIT_API_FUNC_ATTRIBUTE struct sljit_const* sljit_emit_const(struct sljit_compiler *compiler, sljit_s32 dst, sljit_sw dstw, sljit_sw init_value)
 {
 	struct sljit_const *const_;
@@ -3682,70 +3791,4 @@ SLJIT_API_FUNC_ATTRIBUTE void sljit_set_jump_addr(sljit_uw addr, sljit_uw new_ta
 SLJIT_API_FUNC_ATTRIBUTE void sljit_set_const(sljit_uw addr, sljit_sw new_constant, sljit_sw executable_offset)
 {
 	sljit_set_jump_addr(addr, (sljit_uw)new_constant, executable_offset);
-}
-
-SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_atomic_load(struct sljit_compiler *compiler, sljit_s32 op,
-	sljit_s32 base_reg,
-	sljit_s32 data_reg,
-	sljit_s32 temp_reg)
-{
-	CHECK_ERROR();
-	CHECK(check_sljit_emit_atomic_load(compiler, op, base_reg, data_reg, temp_reg));
-
-	sljit_emit_mem_unaligned(compiler, SLJIT_MOV, data_reg, SLJIT_IMM, 0);
-	sljit_u32 inst = 0;
-
-	switch (GET_OPCODE(op)) {
-	case SLJIT_MOV:
-	case SLJIT_MOV32:
-	case SLJIT_MOV_U32:
-		inst = LDAEX;
-		break;
-	case SLJIT_MOV_U8:
-	case SLJIT_MOV32_U8:
-		inst = LDAEXB;
-		break;
-	case SLJIT_MOV_U16:
-	case SLJIT_MOV32_U16:
-		inst = LDAEXH;
-		break;
-	default:
-		SLJIT_UNREACHABLE();
-	}
-	push_inst32(compiler, inst | RN4(base_reg) | RT4(data_reg));
-	return SLJIT_SUCCESS;
-}
-
-SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_atomic_store(struct sljit_compiler *compiler, sljit_s32 op,
-	sljit_s32 base_reg,
-	sljit_s32 data_reg,
-	sljit_s32 temp_reg)
-{
-	CHECK_ERROR();
-	CHECK(check_sljit_emit_atomic_store(compiler, op, base_reg, data_reg, temp_reg));
-
-	compiler->last_flags |= SLJIT_SET_Z;
-	sljit_u32 inst = 0;
-
-	switch (GET_OPCODE(op)) {
-	case SLJIT_MOV:
-	case SLJIT_MOV32:
-	case SLJIT_MOV_U32:
-		inst = STLEX;
-		break;
-	case SLJIT_MOV_U8:
-	case SLJIT_MOV32_U8:
-		inst = STLEXB;
-		break;
-	case SLJIT_MOV_U16:
-	case SLJIT_MOV32_U16:
-		inst = STLEXH;
-		break;
-	default:
-		SLJIT_UNREACHABLE();
-	}
-
-	push_inst32(compiler, inst | RN4(base_reg) | RT4(data_reg)| RM4(temp_reg) );
-	push_inst16(compiler, CMP | IMM8(0) | RDN3(temp_reg));
-	return SLJIT_SUCCESS;
 }
