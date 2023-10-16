@@ -219,7 +219,9 @@ static const sljit_u8 farg_regs[SLJIT_NUMBER_OF_FLOAT_ARG_REGISTERS] = {
 #define IMUL_r_rm	(/* GROUP_0F */ 0xaf)
 #define IMUL_r_rm_i8	0x6b
 #define IMUL_r_rm_i32	0x69
+#define JL_i8		0x7c
 #define JE_i8		0x74
+#define JNC_i8		0x73
 #define JNE_i8		0x75
 #define JMP_i8		0xeb
 #define JMP_i32		0xe9
@@ -259,7 +261,6 @@ static const sljit_u8 farg_regs[SLJIT_NUMBER_OF_FLOAT_ARG_REGISTERS] = {
 #define POPF		0x9d
 #define PREFETCH	0x18
 #define PSHUFD_x_xm	0x70
-#define PUNPCKLDQ_x_xm	0x62
 #define PUSH_i32	0x68
 #define PUSH_r		0x50
 #define PUSH_rm		(/* GROUP_FF */ 6 << 3)
@@ -278,6 +279,7 @@ static const sljit_u8 farg_regs[SLJIT_NUMBER_OF_FLOAT_ARG_REGISTERS] = {
 #define SHLD		(/* GROUP_0F */ 0xa5)
 #define SHRD		(/* GROUP_0F */ 0xad)
 #define SHR		(/* SHIFT */ 5 << 3)
+#define SHUFPS_x_xm	0xc6
 #define SUB		(/* BINARY */ 5 << 3)
 #define SUB_EAX_i32	0x2d
 #define SUB_r_rm	0x2b
@@ -288,6 +290,7 @@ static const sljit_u8 farg_regs[SLJIT_NUMBER_OF_FLOAT_ARG_REGISTERS] = {
 #define TZCNT_r_rm	(/* GROUP_F3 */ /* GROUP_0F */ 0xbc)
 #define UCOMISD_x_xm	0x2e
 #define UNPCKLPD_x_xm	0x14
+#define UNPCKLPS_x_xm	0x14
 #define XCHG_EAX_r	0x90
 #define XCHG_r_rm	0x87
 #define XOR		(/* BINARY */ 6 << 3)
@@ -877,6 +880,9 @@ static sljit_s32 emit_mov(struct sljit_compiler *compiler,
 
 #define EMIT_MOV(compiler, dst, dstw, src, srcw) \
 	FAIL_IF(emit_mov(compiler, dst, dstw, src, srcw));
+
+static sljit_s32 emit_sse2(struct sljit_compiler *compiler, sljit_u8 opcode,
+	sljit_s32 single, sljit_s32 xmm1, sljit_s32 xmm2, sljit_sw xmm2w);
 
 static SLJIT_INLINE sljit_s32 emit_sse2_store(struct sljit_compiler *compiler,
 	sljit_s32 single, sljit_s32 dst, sljit_sw dstw, sljit_s32 src);
