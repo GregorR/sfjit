@@ -2106,11 +2106,12 @@ SLJIT_API_FUNC_ATTRIBUTE struct sljit_alloca* sljit_emit_alloca(struct sljit_com
 
 SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_set_alloca(struct sljit_compiler *compiler, struct sljit_alloca *alloc, sljit_uw size)
 {
+	sljit_ins *inst;
 	(void) compiler;
 	size = (size + 0xfUL) & ~0xfUL;
 	if (size > 0xffffffff)
 		abort();
-	sljit_ins *inst = (sljit_ins *) alloc->addr;
+	inst = (sljit_ins *) alloc->addr;
 	inst[0] = (inst[0] & 0xffe0001f) | (((sljit_s32) size & 0xffff) << 5);
 	inst[1] = (inst[1] & 0xffe0001f) | (((sljit_s32) size >> (16 - 5)) & 0xffff);
 	alloc->size = size;
