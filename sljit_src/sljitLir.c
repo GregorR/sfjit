@@ -912,8 +912,8 @@ static sljit_s32 function_check_src_mem(struct sljit_compiler *compiler, sljit_s
 	if (!(p & SLJIT_MEM))
 		return 0;
 
-	if (p == SLJIT_MEM1(SLJIT_SP))
-		return (i >= 0 && i < compiler->logical_local_size);
+	if (p == SLJIT_MEM1(SLJIT_SP) || p == SLJIT_MEM1(SLJIT_FP))
+		return 1;
 
 	if (!(!(p & REG_MASK) || FUNCTION_CHECK_IS_REG(p & REG_MASK)))
 		return 0;

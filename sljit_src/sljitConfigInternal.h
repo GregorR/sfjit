@@ -617,6 +617,7 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_sw sljit_exec_offset(void *code);
 #define SLJIT_PREF_SHIFT_REG SLJIT_R3
 #define SLJIT_MASKED_SHIFT 1
 #define SLJIT_MASKED_SHIFT32 1
+#define SLJIT_SUPPORT_ALLOCA 1
 
 #elif (defined SLJIT_CONFIG_ARM_32 && SLJIT_CONFIG_ARM_32)
 

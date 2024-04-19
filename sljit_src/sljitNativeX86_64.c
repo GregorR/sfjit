@@ -1412,3 +1412,54 @@ static sljit_s32 skip_frames_before_return(struct sljit_compiler *compiler)
 
 	return adjust_shadow_stack(compiler, SLJIT_MEM1(SLJIT_SP), size);
 }
+
+static sljit_sw gen_alloca(struct sljit_compiler *compiler, struct sljit_alloca *alloc)
+{
+	sljit_u8 *inst;
+	compiler->mode32 = 0;
+	BINARY_IMM32(SUB, 0x2345678, SLJIT_SP, 0);
+	alloc->addr = inst;
+	return SLJIT_SUCCESS;
+}
+
+SLJIT_API_FUNC_ATTRIBUTE struct sljit_alloca* sljit_emit_alloca(struct sljit_compiler *compiler, sljit_uw size)
+{
+	struct sljit_alloca *alloc;
+
+	alloc = (struct sljit_alloca *)
+		ensure_abuf(compiler, sizeof(struct sljit_alloca));
+	PTR_FAIL_IF_NULL(alloc);
+
+	/* Allocate it using an instruction that will definitely take 8 bytes */
+	if (gen_alloca(compiler, alloc) != SLJIT_SUCCESS)
+		return NULL;
+
+	/* Then set it based on the current value */
+	if (sljit_set_alloca(compiler, alloc, size) != SLJIT_SUCCESS)
+		return NULL;
+
+	return alloc;
+}
+
+SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_set_alloca(struct sljit_compiler *compiler, struct sljit_alloca *alloc, sljit_uw size)
+{
+	(void) compiler;
+
+	size = (size + 0xfUL) & ~0xfUL;
+	if (size > 0xffffffff)
+		abort();
+	*((sljit_u32 *) (alloc->addr + 2)) = (sljit_u32) size;
+	alloc->size = size;
+	return SLJIT_SUCCESS;
+}
+
+SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_pop(struct sljit_compiler *compiler, sljit_uw size)
+{
+	sljit_u8 *inst;
+	size = (size + 0xfUL) & ~0xfUL;
+	if (size > 0xffffffff)
+		abort();
+	compiler->mode32 = 0;
+	BINARY_IMM32(ADD, (sljit_u32) size, SLJIT_SP, 0);
+	return SLJIT_SUCCESS;
+}

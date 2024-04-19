@@ -8663,6 +8663,10 @@ static void test74(void)
 #include "sljitTestSimd.h"
 #include "sljitTestSerialize.h"
 
+#if (defined SLJIT_SUPPORT_ALLOCA && SLJIT_SUPPORT_ALLOCA)
+#include "sljitTestAlloca.h"
+#endif
+
 int sljit_test(int argc, char* argv[])
 {
 	sljit_s32 has_arg = (argc >= 2 && argv[1][0] == '-' && argv[1][2] == '\0');
@@ -8824,11 +8828,20 @@ int sljit_test(int argc, char* argv[])
 	test_serialize2();
 	test_serialize3();
 
+#if (defined SLJIT_SUPPORT_ALLOCA && SLJIT_SUPPORT_ALLOCA)
+	if (verbose)
+		printf("---- Alloca tests ----\n");
+	test_alloca1();
+#define EXTRA_TESTS_ALLOCA 1
+#else
+#define EXTRA_TESTS_ALLOCA 0
+#endif
+
 #if (defined SLJIT_EXECUTABLE_ALLOCATOR && SLJIT_EXECUTABLE_ALLOCATOR)
 	sljit_free_unused_memory_exec();
 #endif
 
-#	define TEST_COUNT 121
+#	define TEST_COUNT (121 + EXTRA_TESTS_ALLOCA)
 
 	printf("SLJIT tests: ");
 	if (successful_tests == TEST_COUNT)

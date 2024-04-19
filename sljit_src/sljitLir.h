@@ -458,6 +458,11 @@ struct sljit_generate_code_buffer {
 	sljit_sw executable_offset;
 };
 
+struct sljit_alloca {
+	sljit_uw size;
+	sljit_u8 *addr;
+};
+
 struct sljit_compiler {
 	sljit_s32 error;
 	sljit_s32 options;
@@ -2448,6 +2453,19 @@ SLJIT_API_FUNC_ATTRIBUTE void sljit_set_function_context(void** func_ptr, struct
    it is sometimes desired to free all unused memory regions, e.g.
    before the application terminates. */
 SLJIT_API_FUNC_ATTRIBUTE void sljit_free_unused_memory_exec(void);
+#endif
+
+#if (defined SLJIT_SUPPORT_ALLOCA && SLJIT_SUPPORT_ALLOCA)
+/* Emit stack allocation. Each subsequent stack allocation will consume more
+ * linear stack space. Can be accessed either from the frame pointer or the
+ * stack pointer. The amount allocated can be patched later, if zero. */
+SLJIT_API_FUNC_ATTRIBUTE struct sljit_alloca* sljit_emit_alloca(struct sljit_compiler *compiler, sljit_uw size);
+
+/* Patch this stack allocation to the given size. */
+SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_set_alloca(struct sljit_compiler *compiler, struct sljit_alloca *alloc, sljit_uw size);
+
+/* Emit a stack pop. */
+SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_pop(struct sljit_compiler *compiler, sljit_uw size);
 #endif
 
 #ifdef __cplusplus
