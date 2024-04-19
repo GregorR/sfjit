@@ -185,4 +185,9 @@
 #define SLJIT_CONFIG_LOONGARCH 1
 #endif
 
+/* Only allow things still supported by sfjit */
+#if !defined(SLJIT_CONFIG_X86_64)
+#error Unsupported in sfjit branch
+#endif
+
 #endif /* SLJIT_CONFIG_CPU_H_ */

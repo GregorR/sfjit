@@ -61,7 +61,7 @@ SLJIT_API_FUNC_ATTRIBUTE const char* sljit_get_platform_name(void)
     15 - R15
 */
 
-#define TMP_REG1	(SLJIT_NUMBER_OF_REGISTERS + 2)
+#define TMP_REG1	(SLJIT_NUMBER_OF_REGISTERS + 3)
 #define TMP_FREG	(SLJIT_NUMBER_OF_FLOAT_REGISTERS + 1)
 
 #if (defined SLJIT_CONFIG_X86_32 && SLJIT_CONFIG_X86_32)
@@ -84,19 +84,19 @@ static const sljit_u8 freg_map[SLJIT_NUMBER_OF_FLOAT_REGISTERS + 2] = {
 
 #else /* SLJIT_CONFIG_X86_32 */
 
-#define TMP_REG2	(SLJIT_NUMBER_OF_REGISTERS + 3)
+#define TMP_REG2	(SLJIT_NUMBER_OF_REGISTERS + 4)
 
 /* Note: r12 & 0x7 == 0b100, which decoded as SIB byte present
    Note: avoid to use r12 and r13 for memory addressing
    therefore r12 is better to be a higher saved register. */
 #ifndef _WIN64
 /* Args: rdi(=7), rsi(=6), rdx(=2), rcx(=1), r8, r9. Scratches: rax(=0), r10, r11 */
-static const sljit_u8 reg_map[SLJIT_NUMBER_OF_REGISTERS + 4] = {
-	0, 0, 6, 7, 1, 8, 11, 10, 12, 5, 13, 14, 15, 3, 4, 2, 9
+static const sljit_u8 reg_map[SLJIT_NUMBER_OF_REGISTERS + 5] = {
+	0, 0, 6, 7, 1, 8, 11, 10, 12, 13, 14, 15, 3, 4, 5, 2, 9
 };
 /* low-map. reg_map & 0x7. */
-static const sljit_u8 reg_lmap[SLJIT_NUMBER_OF_REGISTERS + 4] = {
-	0, 0, 6, 7, 1, 0,  3,  2,  4, 5,  5,  6,  7, 3, 4, 2, 1
+static const sljit_u8 reg_lmap[SLJIT_NUMBER_OF_REGISTERS + 5] = {
+	0, 0, 6, 7, 1, 0,  3,  2,  4,  5,  6,  7, 3, 4, 5, 2, 1
 };
 #else
 /* Args: rcx(=1), rdx(=2), r8, r9. Scratches: rax(=0), r10, r11 */

@@ -598,12 +598,12 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_sw sljit_exec_offset(void *code);
 
 #elif (defined SLJIT_CONFIG_X86_64 && SLJIT_CONFIG_X86_64)
 
-#define SLJIT_NUMBER_OF_REGISTERS 13
+#define SLJIT_NUMBER_OF_REGISTERS 12
 #define SLJIT_NUMBER_OF_TEMPORARY_REGISTERS 2
 #define SLJIT_NUMBER_OF_FLOAT_REGISTERS 15
 #define SLJIT_NUMBER_OF_TEMPORARY_FLOAT_REGISTERS 1
 #ifndef _WIN64
-#define SLJIT_NUMBER_OF_SAVED_REGISTERS 6
+#define SLJIT_NUMBER_OF_SAVED_REGISTERS 5
 #define SLJIT_NUMBER_OF_SAVED_FLOAT_REGISTERS 0
 #define SLJIT_LOCALS_OFFSET_BASE 0
 #else /* _WIN64 */
@@ -780,7 +780,7 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_sw sljit_exec_offset(void *code);
 /* Temporary register management. */
 /**********************************/
 
-#define SLJIT_TMP_REGISTER_BASE (SLJIT_NUMBER_OF_REGISTERS + 2)
+#define SLJIT_TMP_REGISTER_BASE (SLJIT_NUMBER_OF_REGISTERS + 3)
 #define SLJIT_TMP_FREGISTER_BASE (SLJIT_NUMBER_OF_FLOAT_REGISTERS + 1)
 
 /* WARNING: Accessing temporary registers is not recommended, because they

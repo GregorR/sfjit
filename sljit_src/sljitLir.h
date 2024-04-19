@@ -212,6 +212,7 @@ extern "C" {
    The immediate offset is extended by the relative stack offset automatically.
    sljit_get_local_base can be used to obtain the real address of a value. */
 #define SLJIT_SP	(SLJIT_NUMBER_OF_REGISTERS + 1)
+#define SLJIT_FP	(SLJIT_NUMBER_OF_REGISTERS + 2)
 
 /* Return with machine word. */
 
