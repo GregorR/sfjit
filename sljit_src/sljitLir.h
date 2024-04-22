@@ -216,7 +216,9 @@ extern "C" {
 
 /* Return with machine word. */
 
+#ifndef SLJIT_RETURN_REG
 #define SLJIT_RETURN_REG	SLJIT_R0
+#endif
 
 /* --------------------------------------------------------------------- */
 /*  Floating point registers                                             */
@@ -363,6 +365,7 @@ extern "C" {
 #define SLJIT_ARG_TYPE_F64		4
 /* 32 bit floating point argument or result. */
 #define SLJIT_ARG_TYPE_F32		5
+#define SLJIT_ARG_TYPE_COUNT		(SLJIT_ARG_TYPE_F32+1)
 
 #define SLJIT_ARG_SHIFT 4
 #define SLJIT_ARG_RETURN(type) (type)
@@ -463,6 +466,12 @@ struct sljit_alloca {
 	sljit_u8 *addr;
 };
 
+struct sljit_marg {
+	struct sljit_marg *next[SLJIT_ARG_TYPE_COUNT];
+	sljit_u32 ct;
+	sljit_u8 args[1];
+};
+
 struct sljit_compiler {
 	sljit_s32 error;
 	sljit_s32 options;
@@ -470,6 +479,7 @@ struct sljit_compiler {
 	struct sljit_label *labels;
 	struct sljit_jump *jumps;
 	struct sljit_const *consts;
+	struct sljit_marg *margs;
 	struct sljit_label *last_label;
 	struct sljit_jump *last_jump;
 	struct sljit_const *last_const;
@@ -497,6 +507,16 @@ struct sljit_compiler {
 	sljit_sw executable_offset;
 	/* Executable size for statistical purposes. */
 	sljit_uw executable_size;
+
+	/* Number of word-y arguments that have thusfar been loaded */
+	sljit_s32 ma_words;
+
+	/* Number of float-y arguments that have thusfar been loaded */
+	sljit_s32 ma_floats;
+
+	/* Offset of the next stack-bound argument relative to the
+	 * frame pointer */
+	sljit_sw ma_stack_offset;
 
 #if (defined SLJIT_HAS_STATUS_FLAGS_STATE && SLJIT_HAS_STATUS_FLAGS_STATE)
 	sljit_s32 status_flags_state;
@@ -2455,6 +2475,8 @@ SLJIT_API_FUNC_ATTRIBUTE void sljit_set_function_context(void** func_ptr, struct
 SLJIT_API_FUNC_ATTRIBUTE void sljit_free_unused_memory_exec(void);
 #endif
 
+#define SLJIT_MAX(a, b) (((a)>(b))?(a):(b))
+
 #if (defined SLJIT_SUPPORT_ALLOCA && SLJIT_SUPPORT_ALLOCA)
 /* Emit stack allocation. Each subsequent stack allocation will consume more
  * linear stack space. Can be accessed either from the frame pointer or the
@@ -2466,6 +2488,54 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_set_alloca(struct sljit_compiler *compi
 
 /* Emit a stack pop. */
 SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_pop(struct sljit_compiler *compiler, sljit_uw size);
+#endif
+
+#if (defined SLJIT_SUPPORT_MARG && SLJIT_SUPPORT_MARG)
+/* Emit an enter for a multi-argument function. Takes only the return type as a
+ * type argument. */
+SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_enter_multiarg(struct sljit_compiler *compiler,
+	sljit_s32 options, sljit_s32 return_type, sljit_s32 scratches, sljit_s32 saveds,
+	sljit_s32 fscratches, sljit_s32 fsaveds, sljit_s32 local_size);
+
+/* When using multi-argument, use this to get the next argument. MUST BE DONE
+ * BEFORE ANY OTHER CODE. Takes a suggested location, which must be a register,
+ * for the argument, and pointers to where to store the actual location of the
+ * argument. The final location will either be your suggested location, or
+ * SLJIT_MEM1(SLJIT_FRAMEP) and an offset. */
+SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_get_marg(struct sljit_compiler *compiler,
+	sljit_s32 type, sljit_s32 sugg,
+	sljit_s32 *actual, sljit_sw *actual_off);
+
+/* Get a multiarg type representation. To create a type representation, start
+ * with NULL and the return type, then one by one add each argument.
+ */
+SLJIT_API_FUNC_ATTRIBUTE struct sljit_marg *sljit_def_marg(struct sljit_compiler *compiler,
+	struct sljit_marg *prev, sljit_s32 type);
+
+/* Get the (a) number of word-like arguments that go in registers, (b) number of
+ * float-like arguments that go in registers, and (c) amount of stack space that
+ * needs to be reserved for this multiarg call. Does not actually reserve stack
+ * space; use sljit_emit_alloca for that. Any of word_regs, float_regs, or
+ * stack_space may be NULL.
+ */
+SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_marg_properties(struct sljit_compiler *compiler,
+	struct sljit_marg *marg, sljit_s32 *word_regs, sljit_s32 *float_regs,
+	sljit_s32 *stack_space);
+
+/* Move one of the non-register arguments of a multi-argument call into place.
+ * Must be called *after* sljit_emit_alloca is used to reserve space.
+ */
+SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_set_marg(struct sljit_compiler *compiler,
+	struct sljit_marg *marg, sljit_u32 idx,
+	sljit_s32 src, sljit_sw srcw);
+
+/* Emit a multi-argument call. Result will be in R0 for word-like results or FR0
+ * for float-like results.
+ */
+SLJIT_API_FUNC_ATTRIBUTE struct sljit_jump *sljit_emit_call_multiarg(struct sljit_compiler *compiler, struct sljit_marg *marg);
+
+/* Emit a multi-argument call. Immediate version. */
+SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_icall_multiarg(struct sljit_compiler *compiler, struct sljit_marg *marg, sljit_s32 src, sljit_sw srcw);
 #endif
 
 #ifdef __cplusplus

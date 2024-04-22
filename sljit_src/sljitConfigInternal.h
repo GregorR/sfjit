@@ -69,9 +69,11 @@ extern "C" {
      SLJIT_NUMBER_OF_REGISTERS : number of available registers
      SLJIT_NUMBER_OF_SCRATCH_REGISTERS : number of available scratch registers
      SLJIT_NUMBER_OF_SAVED_REGISTERS : number of available saved registers
+     SLJIT_NUMBER_OF_ARG_REGISTERS : number of registers used for word arguments, used for multi-argument calls
      SLJIT_NUMBER_OF_FLOAT_REGISTERS : number of available floating point registers
      SLJIT_NUMBER_OF_SCRATCH_FLOAT_REGISTERS : number of available floating point scratch registers
      SLJIT_NUMBER_OF_SAVED_FLOAT_REGISTERS : number of available floating point saved registers
+     SLJIT_NUMBER_OF_FLOAT_ARG_REGISTERS : number of registers used for float arguments, used for multi-argument calls
      SLJIT_NUMBER_OF_TEMPORARY_REGISTERS : number of available temporary registers
      SLJIT_NUMBER_OF_TEMPORARY_FLOAT_REGISTERS : number of available temporary floating point registers
      SLJIT_WORD_SHIFT : the shift required to apply when accessing a sljit_sw/sljit_uw array by index
@@ -603,11 +605,16 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_sw sljit_exec_offset(void *code);
 #define SLJIT_NUMBER_OF_FLOAT_REGISTERS 15
 #define SLJIT_NUMBER_OF_TEMPORARY_FLOAT_REGISTERS 1
 #ifndef _WIN64
+#define SLJIT_NUMBER_OF_ARG_REGISTERS 6
 #define SLJIT_NUMBER_OF_SAVED_REGISTERS 5
+#define SLJIT_NUMBER_OF_FLOAT_ARG_REGISTERS 8
 #define SLJIT_NUMBER_OF_SAVED_FLOAT_REGISTERS 0
 #define SLJIT_LOCALS_OFFSET_BASE 0
+#define SLJIT_RETURN_REG 7
 #else /* _WIN64 */
-#define SLJIT_NUMBER_OF_SAVED_REGISTERS 8
+#define SLJIT_NUMBER_OF_ARG_REGISTERS 4
+#define SLJIT_NUMBER_OF_SAVED_REGISTERS 7
+#define SLJIT_NUMBER_OF_FLOAT_ARG_REGISTERS 4
 #define SLJIT_NUMBER_OF_SAVED_FLOAT_REGISTERS 10
 #define SLJIT_LOCALS_OFFSET_BASE (4 * SSIZE_OF(sw))
 #endif /* !_WIN64 */
@@ -618,6 +625,7 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_sw sljit_exec_offset(void *code);
 #define SLJIT_MASKED_SHIFT 1
 #define SLJIT_MASKED_SHIFT32 1
 #define SLJIT_SUPPORT_ALLOCA 1
+#define SLJIT_SUPPORT_MARG 1
 
 #elif (defined SLJIT_CONFIG_ARM_32 && SLJIT_CONFIG_ARM_32)
 

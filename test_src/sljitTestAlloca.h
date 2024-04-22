@@ -77,11 +77,11 @@ static void test_alloca1(void)
 
 	code.func1((sljit_sw)buf);
 
-	FAILED(buf[0] != 0, "testa1 case 1 failed\n");
-	FAILED(buf[1] != 1, "testa1 case 2 failed\n");
-	FAILED(buf[2] != 2, "testa1 case 3 failed\n");
-	FAILED(buf[3] != 3, "testa1 case 4 failed\n");
-	FAILED(buf[4] != 4, "testa1 case 5 failed\n");
+	FAILED(buf[0] != 0, "test_alloca1 case 1 failed\n");
+	FAILED(buf[1] != 1, "test_alloca1 case 2 failed\n");
+	FAILED(buf[2] != 2, "test_alloca1 case 3 failed\n");
+	FAILED(buf[3] != 3, "test_alloca1 case 4 failed\n");
+	FAILED(buf[4] != 4, "test_alloca1 case 5 failed\n");
 
 	sljit_free_code(code.code, NULL);
 	successful_tests++;

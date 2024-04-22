@@ -529,13 +529,13 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_enter(struct sljit_compiler *compi
 #ifndef _WIN64
 			switch (word_arg_count) {
 			case 0:
-				tmp = SLJIT_R2;
+				tmp = SLJIT_R0;
 				break;
 			case 1:
 				tmp = SLJIT_R1;
 				break;
 			case 2:
-				tmp = TMP_REG1;
+				tmp = SLJIT_R2;
 				break;
 			default:
 				tmp = SLJIT_R3;
@@ -631,7 +631,9 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_enter(struct sljit_compiler *compi
 	}
 #endif /* _WIN64 */
 
-	EMIT_MOV(compiler, SLJIT_FP, 0, SLJIT_SP, 0);
+	compiler->ma_stack_offset = saved_regs_size + local_size;
+	SLJIT_SKIP_CHECKS(compiler);
+	sljit_emit_op1(compiler, SLJIT_MOV_P, SLJIT_FP, 0, SLJIT_SP, 0);
 
 	return SLJIT_SUCCESS;
 }
@@ -786,6 +788,7 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_return_to(struct sljit_compiler *c
 
 static sljit_s32 call_with_args(struct sljit_compiler *compiler, sljit_s32 arg_types, sljit_s32 *src_ptr)
 {
+#if 0 /* margs put args in the correct order, so no longer needed */
 	sljit_s32 src = src_ptr ? (*src_ptr) : 0;
 	sljit_s32 word_arg_count = 0;
 
@@ -811,6 +814,11 @@ static sljit_s32 call_with_args(struct sljit_compiler *compiler, sljit_s32 arg_t
 	}
 
 	return emit_mov(compiler, SLJIT_R2, 0, SLJIT_R0, 0);
+#endif
+	(void) compiler;
+	(void) arg_types;
+	(void) src_ptr;
+	return SLJIT_SUCCESS;
 }
 
 #else
