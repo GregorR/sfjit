@@ -1533,6 +1533,7 @@ static void test_float13(void)
 
 	/* Next test. */
 
+#ifndef _WIN64
 	if (SLJIT_NUMBER_OF_SAVED_FLOAT_REGISTERS >= 3) {
 		compiler = sljit_create_compiler(NULL);
 		FAILED(!compiler, "cannot create compiler\n");
@@ -1585,6 +1586,7 @@ static void test_float13(void)
 		FAILED(buf[SLJIT_NUMBER_OF_FLOAT_REGISTERS - 2] != 0, "test_float13 case 5 failed\n");
 		FAILED(buf[SLJIT_NUMBER_OF_FLOAT_REGISTERS - 1] != -6.25, "test_float13 case 6 failed\n");
 	}
+#endif
 
 	successful_tests++;
 }

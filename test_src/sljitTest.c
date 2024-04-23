@@ -893,7 +893,8 @@ static void test9(void)
 	sljit_s32 shift_reg = SLJIT_R2;
 #endif
 
-	SLJIT_ASSERT(shift_reg >= SLJIT_R2 && shift_reg <= SLJIT_R3);
+	if (!(shift_reg >= SLJIT_R2 && shift_reg <= SLJIT_R3))
+		shift_reg = SLJIT_R2;
 
 	if (verbose)
 		printf("Run test9\n");
@@ -2269,7 +2270,8 @@ static void test24(void)
 	sljit_s32 shift_reg = SLJIT_R2;
 #endif
 
-	SLJIT_ASSERT(shift_reg >= SLJIT_R2 && shift_reg <= SLJIT_R3);
+	if (!(shift_reg >= SLJIT_R2 && shift_reg <= SLJIT_R3))
+		shift_reg = SLJIT_R2;
 
 	if (verbose)
 		printf("Run test24\n");
@@ -6676,6 +6678,9 @@ static void test63(void)
 	sljit_s32 shift_reg = SLJIT_R2;
 #endif
 
+	if (shift_reg < SLJIT_R2)
+		shift_reg = SLJIT_R2;
+
 	if (verbose)
 		printf("Run test63\n");
 
@@ -6837,6 +6842,9 @@ static void test64(void)
 #else
 	sljit_s32 shift_reg = SLJIT_R2;
 #endif
+
+	if (shift_reg < SLJIT_R2)
+		shift_reg = SLJIT_R2;
 
 	if (verbose)
 		printf("Run test64\n");

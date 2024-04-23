@@ -309,9 +309,13 @@
 	(((fscratches < SLJIT_NUMBER_OF_SCRATCH_FLOAT_REGISTERS ? 0 : (fscratches - SLJIT_NUMBER_OF_SCRATCH_FLOAT_REGISTERS)) + \
 		(fsaveds)) * SSIZE_OF(type))
 
+#if 0
 #define ADJUST_LOCAL_OFFSET(p, i) \
 	if ((p) == (SLJIT_MEM1(SLJIT_SP))) \
 		(i) += SLJIT_LOCALS_OFFSET;
+#else
+#define ADJUST_LOCAL_OFFSET(p, i) (void) 0
+#endif
 
 #endif /* !(defined SLJIT_CONFIG_UNSUPPORTED && SLJIT_CONFIG_UNSUPPORTED) */
 
@@ -3557,6 +3561,7 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_enter_multiarg(struct sljit_compil
 	return SLJIT_SUCCESS;
 }
 
+#if !(defined SLJIT_CONFIG_PLATFORM_MARG && SLJIT_CONFIG_PLATFORM_MARG)
 SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_get_marg(struct sljit_compiler *compiler,
 	sljit_s32 type, sljit_s32 sugg,
 	sljit_s32 *actual, sljit_sw *actual_off)
@@ -3666,6 +3671,7 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_get_marg(struct sljit_compiler *co
 	compiler->ma_stack_offset += size;
 	return SLJIT_SUCCESS;
 }
+#endif
 
 SLJIT_API_FUNC_ATTRIBUTE struct sljit_marg *sljit_def_marg(struct sljit_compiler *compiler, struct sljit_marg *prev, sljit_s32 type)
 {
@@ -3694,6 +3700,7 @@ SLJIT_API_FUNC_ATTRIBUTE struct sljit_marg *sljit_def_marg(struct sljit_compiler
 	return ret;
 }
 
+#if !(defined SLJIT_CONFIG_PLATFORM_MARG && SLJIT_CONFIG_PLATFORM_MARG)
 SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_marg_properties(struct sljit_compiler *compiler, struct sljit_marg *marg, sljit_s32 *word_regs, sljit_s32 *float_regs, sljit_s32 *stack_space)
 {
 	sljit_s32 w = 0, f = 0, s = 0;
@@ -3827,6 +3834,7 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_icall_multiarg(struct sljit_compil
 	return sljit_emit_icall(compiler, SLJIT_CALL,
 		SLJIT_ARG_RETURN(marg->args[0]), src, srcw);
 }
+#endif /* SLJIT_CONFIG_PLATFORM_MARG */
 #endif /* SLJIT_SUPPORT_MARG */
 
 #endif /* !SLJIT_CONFIG_UNSUPPORTED */

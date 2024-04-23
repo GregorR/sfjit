@@ -2011,8 +2011,8 @@ static void test_call12(void)
 
 		sljit_set_label(jump, sljit_emit_label(compiler));
 		sljit_emit_enter(compiler, 0, SLJIT_ARGS0(W), 1, 3, 0, SLJIT_NUMBER_OF_SAVED_FLOAT_REGISTERS, 64);
-		sljit_emit_op_dst(compiler, SLJIT_GET_RETURN_ADDRESS, SLJIT_RETURN_REG, 0);
-		sljit_emit_return(compiler, SLJIT_MOV, SLJIT_RETURN_REG, 0);
+		sljit_emit_op_dst(compiler, SLJIT_GET_RETURN_ADDRESS, SLJIT_R0, 0);
+		sljit_emit_return(compiler, SLJIT_MOV, SLJIT_R0, 0);
 
 		code.code = sljit_generate_code(compiler, 0, NULL);
 		CHECK(compiler);
