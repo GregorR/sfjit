@@ -1570,7 +1570,7 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_get_marg(struct sljit_compiler *co
 
 	/* It's in the stack */
 	size = SSIZE_OF(sw);
-	*actual = SLJIT_MEM1(SLJIT_FP);
+	*actual = SLJIT_MEM1(SLJIT_FRAMEP);
 	*actual_off = compiler->ma_stack_offset +
 		SLJIT_NUMBER_OF_ARG_REGISTERS * SSIZE_OF(sw);
 	compiler->ma_stack_offset += size;
