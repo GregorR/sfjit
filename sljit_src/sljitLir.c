@@ -3666,7 +3666,7 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_get_marg(struct sljit_compiler *co
 		size = SSIZE_OF(sw);
 #endif
 	*actual = SLJIT_MEM1(SLJIT_FRAMEP);
-	*actual_off = compiler->ma_stack_offset - SLJIT_LOCALS_OFFSET;
+	*actual_off = compiler->ma_stack_offset;
 	compiler->ma_stack_offset += size;
 	return SLJIT_SUCCESS;
 }

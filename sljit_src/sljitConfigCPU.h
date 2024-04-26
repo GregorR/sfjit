@@ -186,7 +186,8 @@
 #endif
 
 /* Only allow things still supported by sfjit */
-#if !defined(SLJIT_CONFIG_X86_64)
+#if !defined(SLJIT_CONFIG_X86_64) && \
+	!defined(SLJIT_CONFIG_ARM_64)
 #error Unsupported in sfjit branch
 #endif
 

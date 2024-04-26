@@ -34,17 +34,17 @@ typedef sljit_u32 sljit_ins;
 
 #define TMP_ZERO	(0)
 
-#define TMP_REG1	(SLJIT_NUMBER_OF_REGISTERS + 2)
-#define TMP_REG2	(SLJIT_NUMBER_OF_REGISTERS + 3)
-#define TMP_LR		(SLJIT_NUMBER_OF_REGISTERS + 4)
-#define TMP_FP		(SLJIT_NUMBER_OF_REGISTERS + 5)
+#define TMP_REG1	(SLJIT_NUMBER_OF_REGISTERS + 4)
+#define TMP_REG2	(SLJIT_NUMBER_OF_REGISTERS + 5)
+#define TMP_LR		(SLJIT_NUMBER_OF_REGISTERS + 6)
+#define TMP_FP		(SLJIT_NUMBER_OF_REGISTERS + 3)
 
 #define TMP_FREG1	(SLJIT_NUMBER_OF_FLOAT_REGISTERS + 1)
 #define TMP_FREG2	(SLJIT_NUMBER_OF_FLOAT_REGISTERS + 2)
 
 /* r18 - platform register, currently not used */
-static const sljit_u8 reg_map[SLJIT_NUMBER_OF_REGISTERS + 8] = {
-	31, 0, 1, 2, 3, 4, 5, 6, 7, 11, 12, 13, 14, 15, 16, 17, 8, 28, 27, 26, 25, 24, 23, 22, 21, 20, 19, 31, 9, 10, 30, 29
+static const sljit_u8 reg_map[SLJIT_NUMBER_OF_REGISTERS + 9] = {
+	31, 0, 1, 2, 3, 4, 5, 6, 7, 11, 12, 13, 14, 15, 16, 17, 8, 28, 27, 26, 25, 24, 23, 22, 21, 20, 19, 31, 31, 29, 9, 10, 30
 };
 
 static const sljit_u8 freg_map[SLJIT_NUMBER_OF_FLOAT_REGISTERS + 3] = {
@@ -1223,7 +1223,7 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_enter(struct sljit_compiler *compi
 	saved_regs_size += GET_SAVED_FLOAT_REGISTERS_SIZE(fscratches, fsaveds, f64);
 
 	local_size = (local_size + saved_regs_size + 0xf) & ~0xf;
-	compiler->local_size = local_size;
+	compiler->ma_stack_offset = compiler->local_size = local_size;
 
 	if (local_size <= 512) {
 		FAIL_IF(push_inst(compiler, STP_PRE | RT(TMP_FP) | RT2(TMP_LR)
@@ -1403,6 +1403,8 @@ static sljit_s32 emit_stack_frame_release(struct sljit_compiler *compiler, sljit
 {
 	sljit_s32 local_size, prev, fprev, i, tmp;
 	sljit_ins offs;
+
+	push_inst(compiler, ADDI | RD(SLJIT_SP) | RN(TMP_FP) | (0 << 10));
 
 	local_size = compiler->local_size;
 
@@ -3488,4 +3490,60 @@ SLJIT_API_FUNC_ATTRIBUTE void sljit_set_jump_addr(sljit_uw addr, sljit_uw new_ta
 SLJIT_API_FUNC_ATTRIBUTE void sljit_set_const(sljit_uw addr, sljit_sw new_constant, sljit_sw executable_offset)
 {
 	sljit_set_jump_addr(addr, (sljit_uw)new_constant, executable_offset);
+}
+
+static sljit_sw gen_alloca(struct sljit_compiler *compiler, struct sljit_alloca *alloc)
+{
+	alloc->addr = (sljit_u8 *) ensure_buf(compiler, 5 * sizeof(sljit_ins));
+	compiler->buf->used_size -= 5 * sizeof(sljit_ins);
+	load_immediate(compiler, TMP_REG1, 0x12345678);
+	push_inst(compiler, ADDI | RD(TMP_REG2) | RN(SLJIT_STACKP));
+	push_inst(compiler, SUB | RD(TMP_REG2) | RN(TMP_REG2) | RM(TMP_REG1));
+	push_inst(compiler, ADDI | RD(SLJIT_STACKP) | RN(TMP_REG2));
+	return SLJIT_SUCCESS;
+}
+
+SLJIT_API_FUNC_ATTRIBUTE struct sljit_alloca* sljit_emit_alloca(struct sljit_compiler *compiler, sljit_uw size)
+{
+	struct sljit_alloca *alloc;
+
+	alloc = (struct sljit_alloca *)
+		ensure_abuf(compiler, sizeof(struct sljit_alloca));
+	PTR_FAIL_IF_NULL(alloc);
+
+	/* Allocate the allocation space */
+	if (gen_alloca(compiler, alloc) != SLJIT_SUCCESS)
+		return NULL;
+
+	/* Then set it based on the current value */
+	if (sljit_set_alloca(compiler, alloc, size) != SLJIT_SUCCESS)
+		return NULL;
+
+	return alloc;
+}
+
+SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_set_alloca(struct sljit_compiler *compiler, struct sljit_alloca *alloc, sljit_uw size)
+{
+	sljit_ins *inst;
+	(void) compiler;
+	size = (size + 0xfUL) & ~0xfUL;
+	if (size > 0xffffffff)
+		abort();
+	inst = (sljit_ins *) alloc->addr;
+	inst[0] = (inst[0] & 0xffe0001f) | (((sljit_s32) size & 0xffff) << 5);
+	inst[1] = (inst[1] & 0xffe0001f) | (((sljit_s32) size >> (16 - 5)) & 0xffff);
+	alloc->size = size;
+	return SLJIT_SUCCESS;
+}
+
+SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_pop(struct sljit_compiler *compiler, sljit_uw size)
+{
+	size = (size + 0xfUL) & ~0xfUL;
+	if (size > 0xffffffff)
+		abort();
+	load_immediate(compiler, TMP_REG1, (sljit_s32) size);
+	push_inst(compiler, ADDI | RD(TMP_REG2) | RN(SLJIT_STACKP));
+	push_inst(compiler, ADD | RD(TMP_REG2) | RN(TMP_REG2) | RM(TMP_REG1));
+	push_inst(compiler, ADDI | RD(SLJIT_STACKP) | RN(TMP_REG2));
+	return SLJIT_SUCCESS;
 }
