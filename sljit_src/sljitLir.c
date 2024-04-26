@@ -309,13 +309,9 @@
 	(((fscratches < SLJIT_NUMBER_OF_SCRATCH_FLOAT_REGISTERS ? 0 : (fscratches - SLJIT_NUMBER_OF_SCRATCH_FLOAT_REGISTERS)) + \
 		(fsaveds)) * SSIZE_OF(type))
 
-#if 0
 #define ADJUST_LOCAL_OFFSET(p, i) \
 	if ((p) == (SLJIT_MEM1(SLJIT_SP))) \
 		(i) += SLJIT_LOCALS_OFFSET;
-#else
-#define ADJUST_LOCAL_OFFSET(p, i) (void) 0
-#endif
 
 #endif /* !(defined SLJIT_CONFIG_UNSUPPORTED && SLJIT_CONFIG_UNSUPPORTED) */
 
@@ -920,7 +916,10 @@ static sljit_s32 function_check_src_mem(struct sljit_compiler *compiler, sljit_s
 	if (!(p & SLJIT_MEM))
 		return 0;
 
-	if (p == SLJIT_MEM1(SLJIT_SP) || p == SLJIT_MEM1(SLJIT_FP))
+	if (p == SLJIT_MEM1(SLJIT_SP))
+		return (i >= 0 && i < compiler->logical_local_size);
+
+	if (p == SLJIT_MEM1(SLJIT_STACKP) || p == SLJIT_MEM1(SLJIT_FRAMEP))
 		return 1;
 
 	if (!(!(p & REG_MASK) || FUNCTION_CHECK_IS_REG(p & REG_MASK)))
@@ -3666,7 +3665,7 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_get_marg(struct sljit_compiler *co
 	else
 		size = SSIZE_OF(sw);
 #endif
-	*actual = SLJIT_MEM1(SLJIT_FP);
+	*actual = SLJIT_MEM1(SLJIT_FRAMEP);
 	*actual_off = compiler->ma_stack_offset - SLJIT_LOCALS_OFFSET;
 	compiler->ma_stack_offset += size;
 	return SLJIT_SUCCESS;
@@ -3782,7 +3781,7 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_set_marg(
 			sljit_s32 op, dst;
 			sljit_sw dstw = 0;
 			if (mem) {
-				dst = SLJIT_MEM1(SLJIT_SP);
+				dst = SLJIT_MEM1(SLJIT_STACKP);
 				dstw = b;
 			} else if (type < SLJIT_ARG_TYPE_F64) {
 				dst = SLJIT_R(w - 1);

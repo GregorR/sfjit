@@ -186,12 +186,12 @@ static void test_marg1(void)
 		}
 
 		/* To make it a trickier case, get it into the stack */
-		sljit_emit_op1(compiler, SLJIT_MOV, SLJIT_MEM1(SLJIT_FP), 0,
+		sljit_emit_op1(compiler, SLJIT_MOV, SLJIT_MEM1(SLJIT_FRAMEP), 0,
 			SLJIT_IMM, SLJIT_FUNC_ADDR(code2.code));
 
 		/* Make the call */
 		sljit_emit_icall_multiarg(compiler, marg,
-			SLJIT_MEM1(SLJIT_FP), 0);
+			SLJIT_MEM1(SLJIT_FRAMEP), 0);
 
 		if (ssize)
 			sljit_emit_pop(compiler, (sljit_uw) ssize);

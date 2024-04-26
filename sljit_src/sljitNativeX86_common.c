@@ -61,7 +61,7 @@ SLJIT_API_FUNC_ATTRIBUTE const char* sljit_get_platform_name(void)
     15 - R15
 */
 
-#define TMP_REG1	(SLJIT_NUMBER_OF_REGISTERS + 3)
+#define TMP_REG1	(SLJIT_NUMBER_OF_REGISTERS + 4)
 #define TMP_FREG	(SLJIT_NUMBER_OF_FLOAT_REGISTERS + 1)
 
 #if (defined SLJIT_CONFIG_X86_32 && SLJIT_CONFIG_X86_32)
@@ -84,14 +84,14 @@ static const sljit_u8 freg_map[SLJIT_NUMBER_OF_FLOAT_REGISTERS + 2] = {
 
 #else /* SLJIT_CONFIG_X86_32 */
 
-#define TMP_REG2	(SLJIT_NUMBER_OF_REGISTERS + 4)
+#define TMP_REG2	(SLJIT_NUMBER_OF_REGISTERS + 5)
 
 /* Note: r12 & 0x7 == 0b100, which decoded as SIB byte present
    Note: avoid to use r12 and r13 for memory addressing
    therefore r12 is better to be a higher saved register. */
 #ifndef _WIN64
 /* Args: rdi(=7), rsi(=6), rdx(=2), rcx(=1), r8, r9. Scratches: rax(=0), r10, r11 */
-static const sljit_u8 reg_map[SLJIT_NUMBER_OF_REGISTERS + 5] = {
+static const sljit_u8 reg_map[SLJIT_NUMBER_OF_REGISTERS + 6] = {
 	0,
 	/* Arguments */
 	7, 6, 2, 1, 8, 9,
@@ -100,13 +100,13 @@ static const sljit_u8 reg_map[SLJIT_NUMBER_OF_REGISTERS + 5] = {
 	/* Saved */
 	12, 13, 14, 15, 3,
 	/* Stack */
-	4, 5,
+	4, 4, 5,
 	/* Temp */
 	10, 11
 };
 /* low-map. reg_map & 0x7. */
-static const sljit_u8 reg_lmap[SLJIT_NUMBER_OF_REGISTERS + 5] = {
-	0, 7, 6, 2, 1, 0, 1, 0, 4, 5, 6, 7, 3, 4, 5, 2, 3
+static const sljit_u8 reg_lmap[SLJIT_NUMBER_OF_REGISTERS + 6] = {
+	0, 7, 6, 2, 1, 0, 1, 0, 4, 5, 6, 7, 3, 4, 4, 5, 2, 3
 };
 /* Args: xmm0-xmm3 */
 static const sljit_u8 freg_map[SLJIT_NUMBER_OF_FLOAT_REGISTERS + 2] = {
@@ -118,7 +118,7 @@ static const sljit_u8 freg_lmap[SLJIT_NUMBER_OF_FLOAT_REGISTERS + 2] = {
 };
 #else
 /* Args: rcx(=1), rdx(=2), r8, r9. Scratches: rax(=0), r10, r11 */
-static const sljit_u8 reg_map[SLJIT_NUMBER_OF_REGISTERS + 5] = {
+static const sljit_u8 reg_map[SLJIT_NUMBER_OF_REGISTERS + 6] = {
 	0,
 	/* Arguments */
 	1, 2, 8, 9,
@@ -129,13 +129,13 @@ static const sljit_u8 reg_map[SLJIT_NUMBER_OF_REGISTERS + 5] = {
 	/* Saved */
 	6, 7, 13, 14, 15, 3,
 	/* Stack */
-	4, 5,
+	4, 4, 5,
 	/* Temp */
 	10, 11
 };
 /* low-map. reg_map & 0x7. */
-static const sljit_u8 reg_lmap[SLJIT_NUMBER_OF_REGISTERS + 5] = {
-	0, 1, 2, 0, 1, 0, 4, 6, 7, 5, 6, 7, 3, 4, 5, 2, 3
+static const sljit_u8 reg_lmap[SLJIT_NUMBER_OF_REGISTERS + 6] = {
+	0, 1, 2, 0, 1, 0, 4, 6, 7, 5, 6, 7, 3, 4, 4, 5, 2, 3
 };
 /* Args: xmm0-xmm3 */
 static const sljit_u8 freg_map[SLJIT_NUMBER_OF_FLOAT_REGISTERS + 2] = {

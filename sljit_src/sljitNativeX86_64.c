@@ -507,7 +507,7 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_enter(struct sljit_compiler *compi
 	inst = (sljit_u8*) ensure_buf(compiler, 2);
 	FAIL_IF(!inst);
 	INC_SIZE(1);
-	PUSH_REG(reg_lmap[SLJIT_FP]);
+	PUSH_REG(reg_lmap[SLJIT_FRAMEP]);
 
 #ifdef _WIN64
 	local_size += SLJIT_LOCALS_OFFSET;
@@ -633,7 +633,7 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_enter(struct sljit_compiler *compi
 
 	compiler->ma_stack_offset = saved_regs_size + local_size;
 	SLJIT_SKIP_CHECKS(compiler);
-	sljit_emit_op1(compiler, SLJIT_MOV_P, SLJIT_FP, 0, SLJIT_SP, 0);
+	sljit_emit_op1(compiler, SLJIT_MOV_P, SLJIT_FRAMEP, 0, SLJIT_STACKP, 0);
 
 	return SLJIT_SUCCESS;
 }
@@ -678,7 +678,7 @@ static sljit_s32 emit_stack_frame_release(struct sljit_compiler *compiler, sljit
 	sljit_s32 fsaveds = compiler->fsaveds;
 #endif /* _WIN64 */
 
-	EMIT_MOV(compiler, SLJIT_SP, 0, SLJIT_FP, 0);
+	EMIT_MOV(compiler, SLJIT_STACKP, 0, SLJIT_FRAMEP, 0);
 
 #ifdef _WIN64
 	saved_float_regs_offset = GET_SAVED_FLOAT_REGISTERS_SIZE(fscratches, fsaveds, sse2_reg);
@@ -704,7 +704,7 @@ static sljit_s32 emit_stack_frame_release(struct sljit_compiler *compiler, sljit
 
 	local_size = compiler->local_size;
 
-#if 0 /* not needed with FP */
+#if 0 /* Not desirable with FRAMEP */
 	if (is_return_to && compiler->scratches < SLJIT_FIRST_SAVED_REG && (compiler->saveds == SLJIT_KEPT_SAVEDS_COUNT(compiler->options))) {
 		local_size += SSIZE_OF(sw);
 		is_return_to = 0;
@@ -717,7 +717,7 @@ static sljit_s32 emit_stack_frame_release(struct sljit_compiler *compiler, sljit
 	inst = (sljit_u8 *) ensure_buf(compiler, 2);
 	FAIL_IF(!inst);
 	INC_SIZE(1);
-	POP_REG(reg_lmap[SLJIT_FP]);
+	POP_REG(reg_lmap[SLJIT_FRAMEP]);
 
 	tmp = compiler->scratches;
 	for (i = SLJIT_FIRST_SAVED_REG; i <= tmp; i++) {
@@ -1652,7 +1652,7 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_set_marg(
 			sljit_s32 op, dst;
 			sljit_sw dstw = 0;
 			if (mem) {
-				dst = SLJIT_MEM1(SLJIT_SP);
+				dst = SLJIT_MEM1(SLJIT_STACKP);
 				dstw = b +
 					SLJIT_NUMBER_OF_ARG_REGISTERS * SSIZE_OF(sw);
 			} else if (type < SLJIT_ARG_TYPE_F64) {

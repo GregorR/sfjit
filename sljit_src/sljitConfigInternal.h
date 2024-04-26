@@ -792,7 +792,7 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_sw sljit_exec_offset(void *code);
 /* Temporary register management. */
 /**********************************/
 
-#define SLJIT_TMP_REGISTER_BASE (SLJIT_NUMBER_OF_REGISTERS + 3)
+#define SLJIT_TMP_REGISTER_BASE (SLJIT_NUMBER_OF_REGISTERS + 4)
 #define SLJIT_TMP_FREGISTER_BASE (SLJIT_NUMBER_OF_FLOAT_REGISTERS + 1)
 
 /* WARNING: Accessing temporary registers is not recommended, because they

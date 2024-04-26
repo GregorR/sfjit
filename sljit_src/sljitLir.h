@@ -212,7 +212,14 @@ extern "C" {
    The immediate offset is extended by the relative stack offset automatically.
    sljit_get_local_base can be used to obtain the real address of a value. */
 #define SLJIT_SP	(SLJIT_NUMBER_OF_REGISTERS + 1)
-#define SLJIT_FP	(SLJIT_NUMBER_OF_REGISTERS + 2)
+
+/* SLJIT_STACKP is a *raw* accessor to the stack pointer, only to be used with
+ * alloca. */
+#define SLJIT_STACKP	(SLJIT_NUMBER_OF_REGISTERS + 2)
+
+/* SLJIT_FRAMEP is access to the frame pointer. Negative offsets are memory
+ * allocated by alloca. */
+#define SLJIT_FRAMEP	(SLJIT_NUMBER_OF_REGISTERS + 3)
 
 /* Return with machine word. */
 
