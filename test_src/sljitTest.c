@@ -5576,7 +5576,7 @@ static void test55(void)
 	if (verbose)
 		printf("Run test55\n");
 
-	for (i = 0; i < 6; i++) {
+	for (i = 0; i < 6 && i < SLJIT_NUMBER_OF_REGISTERS/2; i++) {
 		compiler = sljit_create_compiler(NULL);
 		FAILED(!compiler, "cannot create compiler\n");
 

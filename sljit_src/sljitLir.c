@@ -3547,7 +3547,7 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_get_local_base(struct sljit_compiler *c
 
 #endif /* !SLJIT_CONFIG_X86 && !SLJIT_CONFIG_ARM_64 */
 
-#if (defined SLJIT_SUPPORT_MARG && SLJIT_SUPPORT_MARG)
+#if (defined SLJIT_SUPPORT_MARG && SLJIT_SUPPORT_MARG) && !(defined SLJIT_CONFIG_PLATFORM_MARG && SLJIT_CONFIG_PLATFORM_MARG)
 SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_enter_multiarg(struct sljit_compiler *compiler,
 	sljit_s32 options, sljit_s32 return_type, sljit_s32 scratches, sljit_s32 saveds,
 	sljit_s32 fscratches, sljit_s32 fsaveds, sljit_s32 local_size)
@@ -3560,7 +3560,6 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_enter_multiarg(struct sljit_compil
 	return SLJIT_SUCCESS;
 }
 
-#if !(defined SLJIT_CONFIG_PLATFORM_MARG && SLJIT_CONFIG_PLATFORM_MARG)
 SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_get_marg(struct sljit_compiler *compiler,
 	sljit_s32 type, sljit_s32 sugg,
 	sljit_s32 *actual, sljit_sw *actual_off)
@@ -3833,7 +3832,6 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_icall_multiarg(struct sljit_compil
 	return sljit_emit_icall(compiler, SLJIT_CALL,
 		SLJIT_ARG_RETURN(marg->args[0]), src, srcw);
 }
-#endif /* SLJIT_CONFIG_PLATFORM_MARG */
 #endif /* SLJIT_SUPPORT_MARG */
 
 #endif /* !SLJIT_CONFIG_UNSUPPORTED */

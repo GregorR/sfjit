@@ -525,6 +525,11 @@ struct sljit_compiler {
 	 * frame pointer */
 	sljit_sw ma_stack_offset;
 
+#if (defined SLJIT_CONFIG_MARG_FLOAT_OFFSET_VAR && SLJIT_CONFIG_MARG_FLOAT_OFFSET_VAR)
+        /* Offset from the frame pointer of floats */
+        sljit_sw ma_float_offset;
+#endif
+
 #if (defined SLJIT_HAS_STATUS_FLAGS_STATE && SLJIT_HAS_STATUS_FLAGS_STATE)
 	sljit_s32 status_flags_state;
 #endif /* SLJIT_HAS_STATUS_FLAGS_STATE */
