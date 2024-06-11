@@ -1473,6 +1473,18 @@ SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_pop(struct sljit_compiler *compile
 }
 
 #ifdef _WIN64
+SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_enter_multiarg(struct sljit_compiler *compiler,
+	sljit_s32 options, sljit_s32 return_type, sljit_s32 scratches, sljit_s32 saveds,
+	sljit_s32 fscratches, sljit_s32 fsaveds, sljit_s32 local_size)
+{
+	FAIL_IF(sljit_emit_enter(compiler, options,
+		SLJIT_ARG_RETURN(return_type), scratches, saveds, fscratches,
+		fsaveds, local_size));
+	compiler->ma_words = 0;
+	compiler->ma_floats = 0;
+	return SLJIT_SUCCESS;
+}
+
 SLJIT_API_FUNC_ATTRIBUTE sljit_s32 sljit_emit_get_marg(struct sljit_compiler *compiler,
 	sljit_s32 type, sljit_s32 sugg,
 	sljit_s32 *actual, sljit_sw *actual_off)
